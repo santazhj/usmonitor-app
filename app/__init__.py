@@ -1,0 +1,1 @@
+"""Serenity Alerts application package."""

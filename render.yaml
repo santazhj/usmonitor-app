@@ -1,0 +1,98 @@
+services:
+  - type: web
+    name: serenity-alerts
+    runtime: python
+    region: singapore
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: serenity-alerts-db
+          property: connectionString
+      - key: APP_BASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_SUMMARY_MODEL
+        value: gpt-5.4-mini
+      - key: X_BEARER_TOKEN
+        sync: false
+      - key: X_ALEABITOREDDIT_USER_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CONTACT
+        sync: false
+      - key: USDT_TRC20_ADDRESS
+        sync: false
+      - key: USDT_ERC20_ADDRESS
+        sync: false
+      - key: MONTHLY_PRICE_USDT
+        value: "99"
+      - key: JOB_SECRET
+        generateValue: true
+      - key: SEND_INITIAL_BACKFILL
+        value: "false"
+
+  - type: cron
+    name: serenity-alerts-poll
+    runtime: python
+    region: singapore
+    schedule: "*/15 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.jobs.poll_sources
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: serenity-alerts-db
+          property: connectionString
+      - fromGroup: serenity-alerts-secrets
+
+databases:
+  - name: serenity-alerts-db
+    region: singapore
+    plan: basic-256mb
+
+envVarGroups:
+  - name: serenity-alerts-secrets
+    envVars:
+      - key: APP_BASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_SUMMARY_MODEL
+        value: gpt-5.4-mini
+      - key: X_BEARER_TOKEN
+        sync: false
+      - key: X_ALEABITOREDDIT_USER_ID
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CONTACT
+        sync: false
+      - key: USDT_TRC20_ADDRESS
+        sync: false
+      - key: USDT_ERC20_ADDRESS
+        sync: false
+      - key: MONTHLY_PRICE_USDT
+        value: "99"
+      - key: SEND_INITIAL_BACKFILL
+        value: "false"

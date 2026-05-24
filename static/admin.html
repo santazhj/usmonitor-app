@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f4ef" />
+    <link rel="icon" href="/icon.svg" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <title>Serenity Admin</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/">
+          <img src="/icon.svg" alt="" />
+          <span>Serenity Admin</span>
+        </a>
+        <nav class="nav-actions">
+          <a class="quiet-link" href="/">App</a>
+        </nav>
+      </header>
+
+      <section class="admin-layout">
+        <section class="panel">
+          <div class="section-title">
+            <p class="eyebrow">Control</p>
+            <h2>操作台</h2>
+          </div>
+          <form id="inviteForm" class="inline-form">
+            <input name="label" placeholder="邀请备注" />
+            <input name="max_uses" type="number" min="1" max="100" value="1" />
+            <button class="secondary" type="submit">创建邀请</button>
+          </form>
+          <button id="pollBtn" class="primary" type="button">立即轮询</button>
+          <p id="adminMessage" class="status-line"></p>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <p class="eyebrow">Metrics</p>
+            <h2>概览</h2>
+          </div>
+          <div id="countsBox" class="metrics-grid"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="section-title">
+            <p class="eyebrow">Payments</p>
+            <h2>待确认付款</h2>
+          </div>
+          <div id="paymentsBox" class="table-list"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="section-title">
+            <p class="eyebrow">Invites</p>
+            <h2>邀请码</h2>
+          </div>
+          <div id="invitesBox" class="table-list"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="section-title">
+            <p class="eyebrow">Sources</p>
+            <h2>监控源</h2>
+          </div>
+          <div id="sourcesBox" class="table-list"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="section-title">
+            <p class="eyebrow">Jobs</p>
+            <h2>任务记录</h2>
+          </div>
+          <div id="jobsBox" class="table-list"></div>
+        </section>
+      </section>
+    </main>
+    <script src="/static/admin.js" type="module"></script>
+  </body>
+</html>
