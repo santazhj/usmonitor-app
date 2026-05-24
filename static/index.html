@@ -17,11 +17,14 @@
           <span>US Monitor</span>
         </a>
         <nav class="nav-actions" aria-label="Primary">
-          <a class="quiet-link" href="#dashboard">Dashboard</a>
-          <a class="quiet-link" href="#alerts">Alerts</a>
-          <a class="quiet-link" href="#account">Account</a>
+          <a class="quiet-link" href="#dashboard" data-i18n="nav.dashboard">Dashboard</a>
+          <a class="quiet-link" href="#alerts" data-i18n="nav.alerts">Alerts</a>
+          <a class="quiet-link" href="#account" data-i18n="nav.account">Account</a>
           <a id="adminLink" class="quiet-link hidden" href="/admin">Admin</a>
-          <button id="logoutBtn" class="text-button hidden" type="button">
+          <button id="languageToggle" class="text-button lang-toggle" type="button">
+            EN
+          </button>
+          <button id="logoutBtn" class="text-button hidden" type="button" data-i18n="nav.logout">
             退出
           </button>
         </nav>
@@ -31,9 +34,9 @@
         <section class="dashboard-main">
           <div class="dashboard-heading">
             <div>
-              <p class="eyebrow">AI Infrastructure</p>
-              <h1>美股 AI 产业链看板</h1>
-              <p class="lede">
+              <p class="eyebrow" data-i18n="hero.eyebrow">AI Infrastructure</p>
+              <h1 data-i18n="hero.title">美股 AI 产业链看板</h1>
+              <p class="lede" data-i18n="hero.lede">
                 按上游算力、半导体、电力、云和软件层拆分 watchlist。行情源未接入前，价格列保持锁定状态。
               </p>
             </div>
@@ -49,15 +52,15 @@
 
           <section class="market-table-wrap" aria-label="AI stock watchlist">
             <div class="market-table-header">
-              <span>Ticker</span>
-              <span>Price</span>
-              <span>% Chg</span>
-              <span>Mkt Cap</span>
-              <span>PE</span>
-              <span>Rev Growth</span>
-              <span>Gross Margin</span>
-              <span>AI Role</span>
-              <span>Latest Signal</span>
+              <span data-i18n="table.ticker">Ticker</span>
+              <span data-i18n="table.price">Price</span>
+              <span data-i18n="table.change">% Chg</span>
+              <span data-i18n="table.marketCap">Mkt Cap</span>
+              <span data-i18n="table.pe">PE</span>
+              <span data-i18n="table.revGrowth">Rev Growth</span>
+              <span data-i18n="table.grossMargin">Gross Margin</span>
+              <span data-i18n="table.aiRole">AI Role</span>
+              <span data-i18n="table.latestSignal">Latest Signal</span>
             </div>
             <div id="dashboardRows" class="market-table-body"></div>
           </section>
@@ -66,19 +69,19 @@
         <aside class="dashboard-rail">
           <section class="rail-panel">
             <div class="section-title">
-              <p class="eyebrow">Source Status</p>
-              <h2>数据状态</h2>
+              <p class="eyebrow" data-i18n="rail.sourceEyebrow">Source Status</p>
+              <h2 data-i18n="rail.sourceTitle">数据状态</h2>
             </div>
             <div id="sourceStatus" class="source-list"></div>
           </section>
 
           <section id="alerts" class="rail-panel">
             <div class="section-title">
-              <p class="eyebrow">Alerts</p>
-              <h2>最新情报</h2>
+              <p class="eyebrow" data-i18n="rail.alertsEyebrow">Alerts</p>
+              <h2 data-i18n="rail.alertsTitle">最新情报</h2>
             </div>
             <div id="feedBox" class="feed-list compact-feed">
-              <p class="empty">登录后查看完整 alert feed。</p>
+              <p class="empty" data-i18n="alerts.signedOut">登录后查看完整 alert feed。</p>
             </div>
           </section>
         </aside>
@@ -87,19 +90,19 @@
       <section id="account" class="account-grid">
         <section id="authView" class="panel auth-panel hidden">
           <div class="section-title">
-            <p class="eyebrow">Invite Only</p>
-            <h2>邮箱魔法链接登录</h2>
+            <p class="eyebrow" data-i18n="auth.eyebrow">Invite Only</p>
+            <h2 data-i18n="auth.title">邮箱魔法链接登录</h2>
           </div>
           <form id="loginForm" class="stack">
             <label>
-              邮箱
+              <span data-i18n="auth.email">邮箱</span>
               <input name="email" type="email" autocomplete="email" required />
             </label>
             <label>
-              邀请码
+              <span data-i18n="auth.inviteCode">邀请码</span>
               <input name="invite_code" type="text" autocomplete="one-time-code" />
             </label>
-            <button class="primary" type="submit">发送登录链接</button>
+            <button class="primary" type="submit" data-i18n="auth.submit">发送登录链接</button>
           </form>
           <p id="loginMessage" class="status-line"></p>
         </section>
@@ -107,7 +110,7 @@
         <section id="memberView" class="member-grid hidden">
           <section class="panel account-panel">
             <div>
-              <p class="eyebrow">Account</p>
+              <p class="eyebrow" data-i18n="account.eyebrow">Account</p>
               <h2 id="accountEmail">-</h2>
             </div>
             <div id="subscriptionState" class="state-box"></div>
@@ -115,14 +118,14 @@
 
           <section class="panel controls-panel">
             <div>
-              <p class="eyebrow">Push</p>
-              <h2>iPhone PWA 推送</h2>
+              <p class="eyebrow" data-i18n="push.eyebrow">Push</p>
+              <h2 data-i18n="push.title">iPhone PWA 推送</h2>
             </div>
             <div class="button-row">
-              <button id="enablePushBtn" class="primary" type="button">
+              <button id="enablePushBtn" class="primary" type="button" data-i18n="push.enable">
                 开启推送
               </button>
-              <button id="testPushBtn" class="secondary" type="button">
+              <button id="testPushBtn" class="secondary" type="button" data-i18n="push.test">
                 测试推送
               </button>
             </div>
@@ -131,25 +134,25 @@
 
           <section class="panel payment-panel">
             <div>
-              <p class="eyebrow">Payment</p>
-              <h2>99 USDT / 月</h2>
+              <p class="eyebrow" data-i18n="payment.eyebrow">Payment</p>
+              <h2 data-i18n="payment.title">99 USDT / 月</h2>
             </div>
             <div id="paymentBox" class="payment-box"></div>
           </section>
 
           <section class="panel lists-panel">
             <div>
-              <p class="eyebrow">Lists</p>
-              <h2>订阅列表</h2>
+              <p class="eyebrow" data-i18n="lists.eyebrow">Lists</p>
+              <h2 data-i18n="lists.title">订阅列表</h2>
             </div>
             <div id="listBox" class="list-box"></div>
           </section>
         </section>
 
         <aside class="panel terms-panel">
-          <p class="eyebrow">Positioning</p>
-          <h2>情报摘要，不是交易建议</h2>
-          <p>
+          <p class="eyebrow" data-i18n="terms.eyebrow">Positioning</p>
+          <h2 data-i18n="terms.title">情报摘要，不是交易建议</h2>
+          <p data-i18n="terms.body">
             第一版仅邀请制开放。邮件只用于登录和账户通知，alert 走 iPhone PWA Web Push。
           </p>
         </aside>

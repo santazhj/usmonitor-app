@@ -148,6 +148,14 @@ h3 {
   color: var(--ink);
 }
 
+.lang-toggle {
+  min-width: 52px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .primary {
   background: var(--green);
   color: #fff;
