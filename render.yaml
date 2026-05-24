@@ -11,6 +11,8 @@ services:
         fromDatabase:
           name: usmonitor-db
           property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: APP_BASE_URL
         sync: false
       - key: SECRET_KEY
@@ -64,6 +66,8 @@ services:
         fromDatabase:
           name: usmonitor-db
           property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: APP_BASE_URL
         sync: false
       - key: OPENAI_API_KEY

@@ -259,6 +259,7 @@ def main() -> int:
 
     common = {
         "DATABASE_URL": database_url,
+        "PYTHON_VERSION": "3.12.8",
         "APP_BASE_URL": APP_BASE_URL,
         "OPENAI_API_KEY": settings["OPENAI_API_KEY"],
         "OPENAI_BASE_URL": settings.get("OPENAI_BASE_URL", ""),
