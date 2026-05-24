@@ -333,11 +333,16 @@ h3 {
   font-size: 15px;
 }
 
-.ticker-cell span {
+.ticker-cell span,
+.ticker-cell small {
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ticker-cell small {
+  font-size: 11px;
 }
 
 .pending-cell {

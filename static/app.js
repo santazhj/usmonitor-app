@@ -101,8 +101,8 @@ function renderDashboard() {
   dashboardMetrics.innerHTML = [
     ["Tracked", snapshot.metrics.tracked_tickers],
     ["Categories", snapshot.metrics.categories],
-    ["Live Prices", snapshot.metrics.live_prices],
-    ["Alert Sources", snapshot.metrics.alert_sources]
+    ["Core Chokepoints", snapshot.metrics.core_chokepoints],
+    ["High Attention", snapshot.metrics.high_attention]
   ]
     .map(
       ([label, value]) => `
@@ -140,6 +140,7 @@ function renderDashboard() {
           <div class="ticker-cell">
             <strong>${escapeHtml(row.ticker)}</strong>
             <span>${escapeHtml(row.company)}</span>
+            <small>${escapeHtml(row.tier)} | ${escapeHtml(row.focus)}</small>
           </div>
           <span class="pending-cell">待接入</span>
           <span class="pending-cell">--</span>
