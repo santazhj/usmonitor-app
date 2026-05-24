@@ -3,28 +3,93 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f7f4ef" />
+    <meta name="theme-color" content="#f4f2ed" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
     <link rel="stylesheet" href="/static/styles.css" />
-    <title>Serenity Alerts</title>
+    <title>US Monitor</title>
   </head>
   <body>
     <main class="shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="Serenity Alerts">
+        <a class="brand" href="/" aria-label="US Monitor">
           <img src="/icon.svg" alt="" />
-          <span>Serenity Alerts</span>
+          <span>US Monitor</span>
         </a>
-        <nav class="nav-actions">
+        <nav class="nav-actions" aria-label="Primary">
+          <a class="quiet-link" href="#dashboard">Dashboard</a>
+          <a class="quiet-link" href="#alerts">Alerts</a>
+          <a class="quiet-link" href="#account">Account</a>
           <a id="adminLink" class="quiet-link hidden" href="/admin">Admin</a>
-          <button id="logoutBtn" class="text-button hidden" type="button">退出</button>
+          <button id="logoutBtn" class="text-button hidden" type="button">
+            退出
+          </button>
         </nav>
       </header>
 
-      <section id="authView" class="auth-grid hidden">
-        <div class="auth-panel">
-          <h1>Serenity Alerts</h1>
+      <section id="dashboard" class="dashboard-shell">
+        <section class="dashboard-main">
+          <div class="dashboard-heading">
+            <div>
+              <p class="eyebrow">AI Infrastructure</p>
+              <h1>美股 AI 产业链看板</h1>
+              <p class="lede">
+                按上游算力、半导体、电力、云和软件层拆分 watchlist。行情源未接入前，价格列保持锁定状态。
+              </p>
+            </div>
+            <div class="refresh-card">
+              <span id="refreshLabel">15s refresh target</span>
+              <strong id="dataStatus">Loading</strong>
+              <small id="lastUpdated">--</small>
+            </div>
+          </div>
+
+          <div class="metric-strip" id="dashboardMetrics"></div>
+          <div class="category-tabs" id="categoryTabs"></div>
+
+          <section class="market-table-wrap" aria-label="AI stock watchlist">
+            <div class="market-table-header">
+              <span>Ticker</span>
+              <span>Price</span>
+              <span>% Chg</span>
+              <span>Mkt Cap</span>
+              <span>PE</span>
+              <span>Rev Growth</span>
+              <span>Gross Margin</span>
+              <span>AI Role</span>
+              <span>Latest Signal</span>
+            </div>
+            <div id="dashboardRows" class="market-table-body"></div>
+          </section>
+        </section>
+
+        <aside class="dashboard-rail">
+          <section class="rail-panel">
+            <div class="section-title">
+              <p class="eyebrow">Source Status</p>
+              <h2>数据状态</h2>
+            </div>
+            <div id="sourceStatus" class="source-list"></div>
+          </section>
+
+          <section id="alerts" class="rail-panel">
+            <div class="section-title">
+              <p class="eyebrow">Alerts</p>
+              <h2>最新情报</h2>
+            </div>
+            <div id="feedBox" class="feed-list compact-feed">
+              <p class="empty">登录后查看完整 alert feed。</p>
+            </div>
+          </section>
+        </aside>
+      </section>
+
+      <section id="account" class="account-grid">
+        <section id="authView" class="panel auth-panel hidden">
+          <div class="section-title">
+            <p class="eyebrow">Invite Only</p>
+            <h2>邮箱魔法链接登录</h2>
+          </div>
           <form id="loginForm" class="stack">
             <label>
               邮箱
@@ -37,57 +102,57 @@
             <button class="primary" type="submit">发送登录链接</button>
           </form>
           <p id="loginMessage" class="status-line"></p>
-        </div>
-        <aside class="terms-panel">
-          <p>99 USDT / 月</p>
-          <p>邀请制。推送为情报摘要，不构成投资建议、收益承诺或个性化交易方案。</p>
+        </section>
+
+        <section id="memberView" class="member-grid hidden">
+          <section class="panel account-panel">
+            <div>
+              <p class="eyebrow">Account</p>
+              <h2 id="accountEmail">-</h2>
+            </div>
+            <div id="subscriptionState" class="state-box"></div>
+          </section>
+
+          <section class="panel controls-panel">
+            <div>
+              <p class="eyebrow">Push</p>
+              <h2>iPhone PWA 推送</h2>
+            </div>
+            <div class="button-row">
+              <button id="enablePushBtn" class="primary" type="button">
+                开启推送
+              </button>
+              <button id="testPushBtn" class="secondary" type="button">
+                测试推送
+              </button>
+            </div>
+            <p id="pushStatus" class="status-line"></p>
+          </section>
+
+          <section class="panel payment-panel">
+            <div>
+              <p class="eyebrow">Payment</p>
+              <h2>99 USDT / 月</h2>
+            </div>
+            <div id="paymentBox" class="payment-box"></div>
+          </section>
+
+          <section class="panel lists-panel">
+            <div>
+              <p class="eyebrow">Lists</p>
+              <h2>订阅列表</h2>
+            </div>
+            <div id="listBox" class="list-box"></div>
+          </section>
+        </section>
+
+        <aside class="panel terms-panel">
+          <p class="eyebrow">Positioning</p>
+          <h2>情报摘要，不是交易建议</h2>
+          <p>
+            第一版仅邀请制开放。邮件只用于登录和账户通知，alert 走 iPhone PWA Web Push。
+          </p>
         </aside>
-      </section>
-
-      <section id="appView" class="app-grid hidden">
-        <section class="panel account-panel">
-          <div>
-            <p class="eyebrow">Account</p>
-            <h2 id="accountEmail">-</h2>
-          </div>
-          <div id="subscriptionState" class="state-box"></div>
-        </section>
-
-        <section class="panel controls-panel">
-          <div>
-            <p class="eyebrow">Push</p>
-            <h2>iPhone PWA</h2>
-          </div>
-          <div class="button-row">
-            <button id="enablePushBtn" class="primary" type="button">开启推送</button>
-            <button id="testPushBtn" class="secondary" type="button">测试推送</button>
-          </div>
-          <p id="pushStatus" class="status-line"></p>
-        </section>
-
-        <section class="panel payment-panel">
-          <div>
-            <p class="eyebrow">Payment</p>
-            <h2>USDT 手动验款</h2>
-          </div>
-          <div id="paymentBox" class="payment-box"></div>
-        </section>
-
-        <section class="panel lists-panel">
-          <div>
-            <p class="eyebrow">Lists</p>
-            <h2>监控列表</h2>
-          </div>
-          <div id="listBox" class="list-box"></div>
-        </section>
-
-        <section class="feed-section">
-          <div class="section-title">
-            <p class="eyebrow">Feed</p>
-            <h2>最新提醒</h2>
-          </div>
-          <div id="feedBox" class="feed-list"></div>
-        </section>
       </section>
     </main>
     <script src="/static/app.js" type="module"></script>

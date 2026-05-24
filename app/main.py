@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.security import random_code, sign_payload, verify_payload
 from app.services.emailer import send_magic_link
+from app.services.dashboard import get_dashboard_snapshot
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
 from app.services.seed import seed_defaults
@@ -269,6 +270,11 @@ async def public_config(settings: Settings = Depends(get_settings)):
         "usdt_erc20_address": settings.usdt_erc20_address,
         "base_url": settings.base_url,
     }
+
+
+@app.get("/api/dashboard")
+async def dashboard():
+    return get_dashboard_snapshot()
 
 
 @app.get("/api/me")

@@ -1,5 +1,5 @@
 const authView = document.querySelector("#authView");
-const appView = document.querySelector("#appView");
+const memberView = document.querySelector("#memberView");
 const loginForm = document.querySelector("#loginForm");
 const loginMessage = document.querySelector("#loginMessage");
 const accountEmail = document.querySelector("#accountEmail");
@@ -12,8 +12,17 @@ const listBox = document.querySelector("#listBox");
 const feedBox = document.querySelector("#feedBox");
 const logoutBtn = document.querySelector("#logoutBtn");
 const adminLink = document.querySelector("#adminLink");
+const dashboardMetrics = document.querySelector("#dashboardMetrics");
+const categoryTabs = document.querySelector("#categoryTabs");
+const dashboardRows = document.querySelector("#dashboardRows");
+const sourceStatus = document.querySelector("#sourceStatus");
+const dataStatus = document.querySelector("#dataStatus");
+const lastUpdated = document.querySelector("#lastUpdated");
+const refreshLabel = document.querySelector("#refreshLabel");
 
 let appConfig = {};
+let dashboardSnapshot = null;
+let selectedCategory = "all";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -29,13 +38,43 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-function show(view) {
-  authView.classList.toggle("hidden", view !== "auth");
-  appView.classList.toggle("hidden", view !== "app");
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function showSignedOut() {
+  authView.classList.remove("hidden");
+  memberView.classList.add("hidden");
+  logoutBtn.classList.add("hidden");
+  adminLink.classList.add("hidden");
+}
+
+function showSignedIn(me) {
+  authView.classList.add("hidden");
+  memberView.classList.remove("hidden");
+  logoutBtn.classList.remove("hidden");
+  adminLink.classList.toggle("hidden", !me.is_admin);
 }
 
 function moneyAddress(value) {
-  return value ? `<code>${value}</code>` : `<span class="muted">未配置</span>`;
+  return value
+    ? `<code>${escapeHtml(value)}</code>`
+    : `<span class="muted">未配置</span>`;
+}
+
+function formatDate(value) {
+  if (!value) return "--";
+  return new Date(value).toLocaleString("zh-Hans", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -45,20 +84,101 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
-async function loadApp() {
+async function loadDashboard() {
+  dashboardSnapshot = await api("/api/dashboard");
+  selectedCategory = selectedCategory || "all";
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const snapshot = dashboardSnapshot;
+  if (!snapshot) return;
+
+  refreshLabel.textContent = `${snapshot.refresh_interval_seconds}s refresh target`;
+  dataStatus.textContent = snapshot.data_status_label;
+  lastUpdated.textContent = `Updated ${formatDate(snapshot.generated_at)}`;
+
+  dashboardMetrics.innerHTML = [
+    ["Tracked", snapshot.metrics.tracked_tickers],
+    ["Categories", snapshot.metrics.categories],
+    ["Live Prices", snapshot.metrics.live_prices],
+    ["Alert Sources", snapshot.metrics.alert_sources]
+  ]
+    .map(
+      ([label, value]) => `
+        <article>
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </article>`
+    )
+    .join("");
+
+  const tabs = [
+    { slug: "all", label: "All", count: snapshot.rows.length },
+    ...snapshot.categories
+  ];
+  categoryTabs.innerHTML = tabs
+    .map(
+      (tab) => `
+        <button class="${tab.slug === selectedCategory ? "active" : ""}"
+          data-category="${escapeHtml(tab.slug)}" type="button">
+          <span>${escapeHtml(tab.label)}</span>
+          <small>${escapeHtml(tab.count)}</small>
+        </button>`
+    )
+    .join("");
+
+  const rows =
+    selectedCategory === "all"
+      ? snapshot.rows
+      : snapshot.rows.filter((row) => row.category === selectedCategory);
+
+  dashboardRows.innerHTML = rows
+    .map(
+      (row) => `
+        <article class="market-row">
+          <div class="ticker-cell">
+            <strong>${escapeHtml(row.ticker)}</strong>
+            <span>${escapeHtml(row.company)}</span>
+          </div>
+          <span class="pending-cell">待接入</span>
+          <span class="pending-cell">--</span>
+          <span class="pending-cell">--</span>
+          <span class="pending-cell">--</span>
+          <span class="pending-cell">--</span>
+          <span class="pending-cell">--</span>
+          <span>${escapeHtml(row.role)}</span>
+          <span>${escapeHtml(row.latest_signal)}</span>
+        </article>`
+    )
+    .join("");
+
+  sourceStatus.innerHTML = snapshot.source_status
+    .map(
+      (source) => `
+        <article class="source-item ${escapeHtml(source.status)}">
+          <div>
+            <strong>${escapeHtml(source.name)}</strong>
+            <span>${escapeHtml(source.detail)}</span>
+          </div>
+          <mark>${escapeHtml(source.status)}</mark>
+        </article>`
+    )
+    .join("");
+}
+
+async function loadApp(existingMe) {
   appConfig = await api("/api/config");
-  const me = await api("/api/me");
-  show("app");
+  const me = existingMe || (await api("/api/me"));
+  showSignedIn(me);
   accountEmail.textContent = me.email;
-  adminLink.classList.toggle("hidden", !me.is_admin);
-  logoutBtn.classList.remove("hidden");
 
   const expires = me.subscription.expires_at
-    ? new Date(me.subscription.expires_at).toLocaleString()
+    ? new Date(me.subscription.expires_at).toLocaleString("zh-Hans")
     : "等待开通";
   subscriptionState.innerHTML = me.subscription.active
-    ? `<strong>已开通</strong><span>${expires}</span>`
-    : `<strong>待付款</strong><span>${expires}</span>`;
+    ? `<strong>已开通</strong><span>${escapeHtml(expires)}</span>`
+    : `<strong>待付款</strong><span>${escapeHtml(expires)}</span>`;
 
   await Promise.all([loadLists(), loadPayment(), loadFeed()]);
   updatePushStatus();
@@ -71,8 +191,8 @@ async function loadLists() {
       (item) => `
         <article class="list-item">
           <div>
-            <strong>${item.name}</strong>
-            <span>${item.description}</span>
+            <strong>${escapeHtml(item.name)}</strong>
+            <span>${escapeHtml(item.description)}</span>
           </div>
           <mark>${item.subscription_active ? "Active" : "Locked"}</mark>
         </article>`
@@ -93,8 +213,8 @@ async function loadPayment() {
   }
   paymentBox.innerHTML = `
     <dl>
-      <div><dt>金额</dt><dd>${payment.amount_usdt} USDT / 月</dd></div>
-      <div><dt>备注码</dt><dd><code>${payment.payment_code}</code></dd></div>
+      <div><dt>金额</dt><dd>${escapeHtml(payment.amount_usdt)} USDT / 月</dd></div>
+      <div><dt>备注码</dt><dd><code>${escapeHtml(payment.payment_code)}</code></dd></div>
       <div><dt>TRC20</dt><dd>${moneyAddress(payment.trc20_address)}</dd></div>
       <div><dt>ERC20</dt><dd>${moneyAddress(payment.erc20_address)}</dd></div>
     </dl>`;
@@ -109,17 +229,23 @@ async function loadFeed() {
   feedBox.innerHTML = feed
     .map(
       (item) => `
-        <article class="alert-card" id="alert-${item.id}">
+        <article class="alert-card" id="alert-${escapeHtml(item.id)}">
           <header>
-            <h3>${item.title}</h3>
-            <time>${new Date(item.created_at).toLocaleString()}</time>
+            <h3>${escapeHtml(item.title)}</h3>
+            <time>${formatDate(item.created_at)}</time>
           </header>
-          <p>${item.notification_text}</p>
-          <ul>${item.bullets.map((bullet) => `<li>${bullet}</li>`).join("")}</ul>
-          <div class="ticker-row">${item.tickers.map((t) => `<span>${t}</span>`).join("")}</div>
-          <p class="why">${item.why_it_matters}</p>
-          <a href="${item.source_url}" target="_blank" rel="noreferrer">查看原帖</a>
-          <small>${item.disclaimer}</small>
+          <p>${escapeHtml(item.notification_text)}</p>
+          <ul>${item.bullets
+            .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
+            .join("")}</ul>
+          <div class="ticker-row">${item.tickers
+            .map((ticker) => `<span>${escapeHtml(ticker)}</span>`)
+            .join("")}</div>
+          <p class="why">${escapeHtml(item.why_it_matters)}</p>
+          <a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">
+            查看原帖
+          </a>
+          <small>${escapeHtml(item.disclaimer)}</small>
         </article>`
     )
     .join("");
@@ -134,7 +260,7 @@ function updatePushStatus() {
     window.navigator.standalone === true ||
     window.matchMedia("(display-mode: standalone)").matches;
   pushStatus.textContent = installed
-    ? "已在主屏幕模式运行。"
+    ? "已在主屏幕模式运行，可以授权通知。"
     : "iPhone 需要先添加到主屏幕，再授权通知。";
 }
 
@@ -160,6 +286,13 @@ async function enablePush() {
   pushStatus.textContent = "推送已开启。";
 }
 
+categoryTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-category]");
+  if (!button) return;
+  selectedCategory = button.dataset.category;
+  renderDashboard();
+});
+
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(loginForm);
@@ -170,9 +303,9 @@ loginForm.addEventListener("submit", async (event) => {
       body: JSON.stringify(Object.fromEntries(form.entries()))
     });
     loginMessage.innerHTML = result.dev_magic_link
-      ? `开发模式链接：<a href="${result.dev_magic_link}">打开登录</a>`
+      ? `开发模式链接：<a href="${escapeHtml(result.dev_magic_link)}">打开登录</a>`
       : "登录链接已发送。";
-  } catch (error) {
+  } catch {
     loginMessage.textContent = "登录失败，请检查邮箱或邀请码。";
   }
 });
@@ -181,13 +314,17 @@ enablePushBtn.addEventListener("click", enablePush);
 testPushBtn.addEventListener("click", async () => {
   pushStatus.textContent = "发送测试中...";
   const result = await api("/api/push/test", { method: "POST" });
-  pushStatus.textContent = `测试完成：${result.sent} 成功，${result.failed} 失败。`;
+  pushStatus.textContent = `测试完成，${result.sent} 成功，${result.failed} 失败。`;
 });
 logoutBtn.addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" });
   location.reload();
 });
 
+loadDashboard().catch(() => {
+  dataStatus.textContent = "Dashboard unavailable";
+});
+
 api("/api/me")
   .then(loadApp)
-  .catch(() => show("auth"));
+  .catch(() => showSignedOut());
