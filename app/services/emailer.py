@@ -7,6 +7,8 @@ from app.config import Settings
 
 async def send_magic_link(settings: Settings, email: str, link: str) -> dict:
     if not settings.resend_api_key:
+        if settings.secure_cookies:
+            raise RuntimeError("RESEND_API_KEY is required in production")
         return {"sent": False, "dev_magic_link": link}
 
     async with httpx.AsyncClient(timeout=15) as client:
