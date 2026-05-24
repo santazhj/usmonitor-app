@@ -16,11 +16,21 @@
           <span>Serenity Admin</span>
         </a>
         <nav class="nav-actions">
+          <span id="adminSession" class="admin-session hidden"></span>
           <a class="quiet-link" href="/">App</a>
         </nav>
       </header>
 
-      <section class="admin-layout">
+      <section id="accessGate" class="panel access-gate">
+        <div class="section-title">
+          <p class="eyebrow">Admin Check</p>
+          <h2>正在验证管理员权限</h2>
+        </div>
+        <p id="accessMessage" class="status-line">请稍候。</p>
+        <a id="accessAction" class="primary access-action hidden" href="/">回到 App 登录</a>
+      </section>
+
+      <section id="adminContent" class="admin-layout hidden">
         <section class="panel">
           <div class="section-title">
             <p class="eyebrow">Control</p>

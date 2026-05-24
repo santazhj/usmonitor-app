@@ -107,6 +107,11 @@ code {
   text-decoration: none;
 }
 
+.admin-session {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .primary {
   background: var(--leaf);
   color: #fff;
@@ -332,6 +337,21 @@ mark {
 
 .admin-layout .wide {
   grid-column: 1 / -1;
+}
+
+.access-gate {
+  max-width: 640px;
+  margin: 48px auto 0;
+}
+
+.access-action {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 42px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 16px;
+  text-decoration: none;
 }
 
 .inline-form {
