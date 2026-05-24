@@ -93,6 +93,17 @@ class RenderAPI:
                 break
         return items
 
+    def service_env_vars(self, service_id: str) -> dict[str, str]:
+        entries = self.request("GET", f"/services/{service_id}/env-vars")
+        values: dict[str, str] = {}
+        for entry in entries:
+            env_var = entry.get("envVar", entry)
+            key = env_var.get("key")
+            value = env_var.get("value")
+            if key and value is not None:
+                values[key] = value
+        return values
+
 
 def choose_owner(api: RenderAPI, settings: dict[str, str]) -> str:
     if settings.get("RENDER_OWNER_ID"):
@@ -253,8 +264,19 @@ def main() -> int:
     postgres = ensure_postgres(api, owner_id)
     database_url = wait_for_database_url(api, postgres["id"])
 
-    secret_key = settings.get("SECRET_KEY") or secrets.token_urlsafe(48)
-    job_secret = settings.get("JOB_SECRET") or secrets.token_urlsafe(32)
+    existing_web = service_by_name(api, owner_id, WEB_SERVICE_NAME, "web_service")
+    existing_web_env = api.service_env_vars(existing_web["id"]) if existing_web else {}
+
+    secret_key = (
+        settings.get("SECRET_KEY")
+        or existing_web_env.get("SECRET_KEY")
+        or secrets.token_urlsafe(48)
+    )
+    job_secret = (
+        settings.get("JOB_SECRET")
+        or existing_web_env.get("JOB_SECRET")
+        or secrets.token_urlsafe(32)
+    )
     vapid_contact = settings.get("VAPID_CONTACT", "mailto:alerts@usmonitor.app")
 
     common = {
