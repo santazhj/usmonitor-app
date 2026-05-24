@@ -16,8 +16,8 @@ python -m venv .venv
 .\.venv\Scripts\uvicorn app.main:app --reload
 ```
 
-This workspace also includes a local `.env` with development-only keys and
-`ADMIN_EMAILS=admin@example.com`, so you can start immediately:
+This workspace also includes a local `.env` with development-only values for
+this machine, so you can start immediately:
 
 ```powershell
 .\scripts\start-dev.ps1

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: serenity-alerts
+    name: usmonitor-app
     runtime: python
     region: singapore
     plan: starter
@@ -9,7 +9,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: serenity-alerts-db
+          name: usmonitor-db
           property: connectionString
       - key: APP_BASE_URL
         sync: false
@@ -47,7 +47,7 @@ services:
         value: "false"
 
   - type: cron
-    name: serenity-alerts-poll
+    name: usmonitor-poll
     runtime: python
     region: singapore
     schedule: "*/15 * * * *"
@@ -56,23 +56,9 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: serenity-alerts-db
+          name: usmonitor-db
           property: connectionString
-      - fromGroup: serenity-alerts-secrets
-
-databases:
-  - name: serenity-alerts-db
-    region: singapore
-    plan: basic-256mb
-
-envVarGroups:
-  - name: serenity-alerts-secrets
-    envVars:
       - key: APP_BASE_URL
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: ADMIN_EMAILS
         sync: false
       - key: OPENAI_API_KEY
         sync: false
@@ -88,11 +74,10 @@ envVarGroups:
         sync: false
       - key: VAPID_CONTACT
         sync: false
-      - key: USDT_TRC20_ADDRESS
-        sync: false
-      - key: USDT_ERC20_ADDRESS
-        sync: false
-      - key: MONTHLY_PRICE_USDT
-        value: "99"
       - key: SEND_INITIAL_BACKFILL
         value: "false"
+
+databases:
+  - name: usmonitor-db
+    region: singapore
+    plan: basic-256mb

@@ -15,9 +15,10 @@ In Render:
 1. New > Blueprint.
 2. Connect the GitHub repo.
 3. Select `render.yaml`.
-4. Create the web service, cron job, and Postgres database.
+4. Create the `usmonitor-app` web service, `usmonitor-poll` cron job, and
+   `usmonitor-db` Postgres database.
 
-Set these production env vars on both the web service and cron job:
+Set these production env vars on the web service:
 
 - `APP_BASE_URL=https://usmonitor.app`
 - `ADMIN_EMAILS=santazhj@gmail.com`
@@ -31,6 +32,17 @@ Set these production env vars on both the web service and cron job:
 - `USDT_TRC20_ADDRESS=TKFHqMfArpi8wA8kCEEj6rV3HdcM1zfT5g`
 - `USDT_ERC20_ADDRESS=0x7c9C0574fa32886F6e6BCc3BD2f5502C4e7F1609`
 - `MONTHLY_PRICE_USDT=99`
+- `SEND_INITIAL_BACKFILL=false`
+
+Set these production env vars on the cron job:
+
+- `APP_BASE_URL=https://usmonitor.app`
+- `OPENAI_API_KEY=<your OpenAI API key>`
+- `X_BEARER_TOKEN=<your X API bearer token>`
+- `X_ALEABITOREDDIT_USER_ID=<optional, can be blank>`
+- `VAPID_PUBLIC_KEY=<same public key as web>`
+- `VAPID_PRIVATE_KEY=<same private key as web>`
+- `VAPID_CONTACT=mailto:alerts@usmonitor.app`
 - `SEND_INITIAL_BACKFILL=false`
 
 Generate VAPID keys locally with:
