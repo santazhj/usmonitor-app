@@ -51,6 +51,22 @@ Generate VAPID keys locally with:
 .\.venv\Scripts\python.exe -m app.cli generate-vapid
 ```
 
+### API deployment alternative
+
+If you create a Render API key, copy `.env.deploy.example` to `.env.deploy`,
+fill the missing values, then run:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\deploy_render.py
+```
+
+The script creates or reuses:
+
+- `usmonitor-db` Postgres in Singapore.
+- `usmonitor-app` web service.
+- `usmonitor-poll` 15-minute cron job.
+- `usmonitor.app` and `www.usmonitor.app` custom domains.
+
 ## 3. Add the Custom Domain in Render
 
 In the Render web service:
