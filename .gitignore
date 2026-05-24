@@ -6,6 +6,8 @@ __pycache__/
 *.log
 *.db
 .env
+.env.*
+!.env.example
 serenity_alerts.db
 uvicorn.out.log
 uvicorn.err.log
