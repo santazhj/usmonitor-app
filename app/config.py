@@ -33,7 +33,10 @@ class Settings:
     admin_emails: tuple[str, ...] = tuple(_list_env("ADMIN_EMAILS"))
 
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "").rstrip("/")
     openai_summary_model: str = os.getenv("OPENAI_SUMMARY_MODEL", "gpt-5.4-mini")
+    openai_http_referer: str = os.getenv("OPENAI_HTTP_REFERER", "")
+    openai_app_title: str = os.getenv("OPENAI_APP_TITLE", "US Monitor")
     x_bearer_token: str = os.getenv("X_BEARER_TOKEN", "")
     x_aleabitoreddit_user_id: str = os.getenv("X_ALEABITOREDDIT_USER_ID", "")
 

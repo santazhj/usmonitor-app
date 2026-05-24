@@ -23,6 +23,10 @@ Set these production env vars on the web service:
 - `APP_BASE_URL=https://usmonitor.app`
 - `ADMIN_EMAILS=santazhj@gmail.com`
 - `OPENAI_API_KEY=<your OpenAI API key>`
+- `OPENAI_BASE_URL=<blank for OpenAI, https://openrouter.ai/api/v1 for OpenRouter>`
+- `OPENAI_SUMMARY_MODEL=<OpenAI model id or OpenRouter model id>`
+- `OPENAI_HTTP_REFERER=https://usmonitor.app`
+- `OPENAI_APP_TITLE=US Monitor`
 - `X_BEARER_TOKEN=<your X API bearer token>`
 - `RESEND_API_KEY=<your Resend API key>`
 - `EMAIL_FROM=US Monitor <alerts@usmonitor.app>`
@@ -38,6 +42,10 @@ Set these production env vars on the cron job:
 
 - `APP_BASE_URL=https://usmonitor.app`
 - `OPENAI_API_KEY=<your OpenAI API key>`
+- `OPENAI_BASE_URL=<blank for OpenAI, https://openrouter.ai/api/v1 for OpenRouter>`
+- `OPENAI_SUMMARY_MODEL=<OpenAI model id or OpenRouter model id>`
+- `OPENAI_HTTP_REFERER=https://usmonitor.app`
+- `OPENAI_APP_TITLE=US Monitor`
 - `X_BEARER_TOKEN=<your X API bearer token>`
 - `X_ALEABITOREDDIT_USER_ID=<optional, can be blank>`
 - `VAPID_PUBLIC_KEY=<same public key as web>`

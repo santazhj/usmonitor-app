@@ -43,7 +43,18 @@ def summarize_post(settings: Settings, post: XPost) -> tuple[SummaryOutput, str]
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=settings.openai_api_key)
+        client_kwargs = {"api_key": settings.openai_api_key}
+        if settings.openai_base_url:
+            client_kwargs["base_url"] = settings.openai_base_url
+        default_headers = {}
+        if settings.openai_http_referer:
+            default_headers["HTTP-Referer"] = settings.openai_http_referer
+        if settings.openai_app_title:
+            default_headers["X-OpenRouter-Title"] = settings.openai_app_title
+        if default_headers:
+            client_kwargs["default_headers"] = default_headers
+
+        client = OpenAI(**client_kwargs)
         response = client.responses.parse(
             model=settings.openai_summary_model,
             input=[

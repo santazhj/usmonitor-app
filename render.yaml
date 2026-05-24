@@ -19,8 +19,14 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
       - key: OPENAI_SUMMARY_MODEL
         value: gpt-5.4-mini
+      - key: OPENAI_HTTP_REFERER
+        value: https://usmonitor.app
+      - key: OPENAI_APP_TITLE
+        value: US Monitor
       - key: X_BEARER_TOKEN
         sync: false
       - key: X_ALEABITOREDDIT_USER_ID
@@ -62,8 +68,14 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
       - key: OPENAI_SUMMARY_MODEL
         value: gpt-5.4-mini
+      - key: OPENAI_HTTP_REFERER
+        value: https://usmonitor.app
+      - key: OPENAI_APP_TITLE
+        value: US Monitor
       - key: X_BEARER_TOKEN
         sync: false
       - key: X_ALEABITOREDDIT_USER_ID
