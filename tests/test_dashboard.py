@@ -105,7 +105,7 @@ def test_dashboard_snapshot_includes_dynamic_positive_mentions():
 
 def test_dashboard_excludes_dynamic_mainland_positive_mentions():
     mention = WatchlistMention(
-        ticker="300308.SZ",
+        ticker=" 300308.SZ ",
         reason="Positive source mention.",
         source_url="https://x.com/aleabitoreddit/status/2",
         sentiment="positive",

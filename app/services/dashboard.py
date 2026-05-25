@@ -9,8 +9,12 @@ from app.services.market_data import MarketDataResult
 MAINLAND_LISTING_SUFFIXES = (".SZ", ".SS", ".SH", ".BJ")
 
 
+def normalize_ticker(ticker: str) -> str:
+    return ticker.strip().upper()
+
+
 def is_mainland_listing(ticker: str) -> bool:
-    return ticker.upper().endswith(MAINLAND_LISTING_SUFFIXES)
+    return normalize_ticker(ticker).endswith(MAINLAND_LISTING_SUFFIXES)
 
 
 def row(
@@ -722,7 +726,7 @@ def mention_rows(mentions: list[WatchlistMention]) -> list[dict]:
     rows = []
     seen = set()
     for mention in mentions:
-        ticker = mention.ticker.upper()
+        ticker = normalize_ticker(mention.ticker)
         if is_mainland_listing(ticker):
             continue
         if ticker in existing or ticker in seen:
@@ -752,7 +756,9 @@ def mention_rows(mentions: list[WatchlistMention]) -> list[dict]:
 def latest_mention_by_ticker(mentions: list[WatchlistMention]) -> dict[str, WatchlistMention]:
     latest = {}
     for mention in mentions:
-        ticker = mention.ticker.upper()
+        ticker = normalize_ticker(mention.ticker)
+        if is_mainland_listing(ticker):
+            continue
         if ticker not in latest:
             latest[ticker] = mention
     return latest
@@ -806,6 +812,7 @@ def get_dashboard_snapshot(
             **_market_payload(item, market_rows),
         }
         for item in [*base_rows, *extra_rows]
+        if not is_mainland_listing(item["ticker"])
     ]
     core_count = sum(1 for item in rows if item["tier"] == "Core chokepoint")
     high_attention_count = sum(
