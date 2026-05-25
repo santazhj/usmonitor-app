@@ -14,7 +14,7 @@ from app.models import AlertSummary
 
 logger = logging.getLogger(__name__)
 
-LOCALIZATION_CACHE_KEY = "feed_zh_v3"
+LOCALIZATION_CACHE_KEY = "feed_zh_v4"
 LOCALIZATION_ROOT_KEY = "_serenity_localizations"
 TICKER_RE = re.compile(r"\$([A-Za-z][A-Za-z0-9.]{0,9})")
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
@@ -36,11 +36,15 @@ COMMON_ENGLISH_WORD_RE = re.compile(
     r"this|what|like|deserve|special|listen|anon)\b",
     re.IGNORECASE,
 )
+GENERIC_TITLE_RE = re.compile(
+    r"(serenity|alerts?|新帖|提醒|总结|summary|new post)",
+    re.IGNORECASE,
+)
 
 
 class FeedLocalizationItem(BaseModel):
     id: str
-    title: str = Field(max_length=120)
+    title: str = Field(max_length=40)
     notification_text: str = Field(max_length=500)
     bullets: list[str] = Field(default_factory=list, max_length=3)
     why_it_matters: str = Field(max_length=400)
@@ -96,6 +100,8 @@ def cache_zh(summary: AlertSummary, payload: dict[str, Any]) -> None:
 def existing_chinese_payload(summary: AlertSummary) -> dict[str, Any] | None:
     if not has_chinese(summary.notification_text or ""):
         return None
+    if not title_quality_ok(summary.title):
+        return None
     return {
         "title": summary.title,
         "notification_text": summary.notification_text,
@@ -107,6 +113,8 @@ def existing_chinese_payload(summary: AlertSummary) -> dict[str, Any] | None:
 def _tickers(text: str, fallback: list[str] | None = None) -> list[str]:
     found = {match.upper() for match in TICKER_RE.findall(text or "")}
     found.update(str(ticker).strip().lstrip("$").upper() for ticker in fallback or [] if ticker)
+    dotted_bases = {ticker.split(".", 1)[0] for ticker in found if "." in ticker}
+    found = {ticker for ticker in found if "." in ticker or ticker not in dotted_bases}
     return sorted(found)
 
 
@@ -154,10 +162,14 @@ def allowed_english_stripped(text: str) -> str:
     ]
     for word in allowed:
         stripped = re.sub(rf"\b{re.escape(word)}\b", " ", stripped, flags=re.IGNORECASE)
+    stripped = re.sub(r"\b[A-Z]{2,10}\b", " ", stripped)
+    stripped = re.sub(r"\b[A-Z][A-Za-z]{2,24}\b", " ", stripped)
     return stripped
 
 
 def payload_quality_ok(payload: dict[str, Any]) -> bool:
+    if not title_quality_ok(str(payload.get("title") or "")):
+        return False
     text = " ".join(
         [
             str(payload.get("notification_text") or ""),
@@ -175,6 +187,19 @@ def payload_quality_ok(payload: dict[str, Any]) -> bool:
     latin_letters = len(re.findall(r"[A-Za-z]", stripped))
     cjk_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
     return cjk_chars > 0 and latin_letters / max(cjk_chars, 1) < 0.08
+
+
+def title_quality_ok(title: str) -> bool:
+    title = " ".join((title or "").split())
+    if not title or len(title) > 40:
+        return False
+    if URL_RE.search(title) or "@" in title:
+        return False
+    if GENERIC_TITLE_RE.search(title):
+        return False
+    if not has_chinese(title):
+        return False
+    return len(re.findall(r"[\u4e00-\u9fff]", title)) >= 4
 
 
 def clean_source_for_translation(text: str) -> str:
@@ -224,14 +249,33 @@ def fallback_zh_payload(summary: AlertSummary) -> dict[str, Any]:
     tickers = _tickers(text, summary.tickers)
     ticker_text = "、".join(f"${ticker}" for ticker in tickers) if tickers else "相关标的"
     restatement = rough_translate_fallback(text)
+    title = fallback_zh_title(text, tickers)
     notification = f"作者这条帖子的意思是（涉及 {ticker_text}）：{restatement}"
     bullets = [f"涉及标的：{ticker_text}", "含义：这是原帖语义的中文转述，等待模型生成更精确版本。"]
     return {
-        "title": "Serenity 新帖提醒",
+        "title": title,
         "notification_text": notification[:420],
         "bullets": bullets[:3],
         "why_it_matters": "中文 feed 会优先使用模型翻译原帖全段意思；模型暂不可用时显示这版临时中文转述。",
     }
+
+
+def fallback_zh_title(text: str, tickers: list[str]) -> str:
+    primary = f"${tickers[0]}" if tickers else "相关标的"
+    lower = text.lower()
+    if any(word in lower for word in ["valuation", "valued", "undervalued", "cheap"]):
+        return f"{primary} 估值线索更新"
+    if any(word in lower for word in ["institutional inflow", "index inclusion", "vanguard", "blackrock", "msci", "nasdaq"]):
+        return f"{primary} 机构资金催化"
+    if any(word in lower for word in ["beneficiary", "benefit", "winner"]):
+        return f"{primary} 受益逻辑更新"
+    if any(word in lower for word in ["netflix special", "deserve my own"]):
+        return f"{primary} 成功案例调侃"
+    if any(word in lower for word in ["subscribe", "followers", "thank"]):
+        return "订阅人数进展"
+    if tickers:
+        return f"{primary} 观点更新"
+    return "市场观点更新"
 
 
 def _client_kwargs(settings: Settings) -> dict[str, Any]:
@@ -290,6 +334,8 @@ def generate_zh_batch(
         "中文要像中国投资者日常会说的话，顺口、自然，不要翻译腔。"
         "保留股票代码、关键公司名、语气和因果关系；链接可概括为“附了链接”。"
         "不要写“原帖提到”、不要说“需要结合原帖”、不要让用户自己去看原帖。"
+        "title 必须是对整条帖子的短标题，8-22 个中文字符，像财经快讯标题；"
+        "可以包含核心 ticker，但禁止使用“Serenity 新帖提醒”“总结”“新帖”等泛化标题。"
         "除了股票代码、公司名、指数名、机构名之外，禁止保留英文句子或英文短语。"
         "如果原文有 'we are about to see'，要译成“接下来可能会看到”。"
         "如果原文有 'This is what it is like'，要译成“这就是这种阶段通常会发生的事情”。"
@@ -314,7 +360,7 @@ def generate_zh_batch(
                         "role": "user",
                         "content": (
                             "请按原 id 返回。每条 notification_text 要直接复述作者整段话的中文意思，"
-                            "不是关键词摘要。\n"
+                            "不是关键词摘要；每条 title 要概括全篇重点，不要固定模板标题。\n"
                             f"{json.dumps(items, ensure_ascii=False)}"
                         ),
                     },
@@ -349,7 +395,7 @@ def generate_zh_batch(
                         '{"items":[{"id":"...","title":"...","notification_text":"...",'
                         '"bullets":["..."],"why_it_matters":"..."}]}。'
                         "再次强调：notification_text 必须是中国用户能直接读懂的自然中文，"
-                        "不得残留英文句子或英文短语。"
+                        "不得残留英文句子或英文短语；title 必须是智能短标题，不得写 Serenity 新帖提醒。"
                         f"\n需要处理的 items:\n{json.dumps(items, ensure_ascii=False)}"
                     ),
                 },
