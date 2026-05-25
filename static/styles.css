@@ -295,9 +295,9 @@ h3 {
 
 .market-table-header,
 .market-row {
-  min-width: 1180px;
+  min-width: 1260px;
   display: grid;
-  grid-template-columns: 180px 86px 70px 96px 68px 104px 112px 240px 1fr;
+  grid-template-columns: 180px 86px 76px 96px 96px 68px 104px 112px 240px 1fr;
   gap: 10px;
   align-items: center;
 }
@@ -356,6 +356,24 @@ h3 {
 .pending-cell {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.price-cell,
+.change-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.value-up {
+  color: var(--green);
+}
+
+.value-down {
+  color: var(--red);
+}
+
+.source-item.error mark {
+  background: #f8ded8;
+  color: var(--red);
 }
 
 .dashboard-rail {
@@ -660,8 +678,8 @@ mark {
 
   .market-table-header,
   .market-row {
-    min-width: 1080px;
-    grid-template-columns: 168px 78px 68px 88px 62px 96px 104px 220px 1fr;
+    min-width: 1160px;
+    grid-template-columns: 168px 78px 72px 88px 88px 62px 96px 104px 220px 1fr;
   }
 
   .payment-box div {

@@ -30,7 +30,8 @@ from app.models import (
 )
 from app.security import random_code, sign_payload, verify_payload
 from app.services.emailer import send_magic_link
-from app.services.dashboard import get_dashboard_snapshot
+from app.services.dashboard import dashboard_tickers, get_dashboard_snapshot
+from app.services.market_data import fetch_massive_market_data
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
 from app.services.seed import seed_defaults
@@ -273,8 +274,9 @@ async def public_config(settings: Settings = Depends(get_settings)):
 
 
 @app.get("/api/dashboard")
-async def dashboard():
-    return get_dashboard_snapshot()
+async def dashboard(settings: Settings = Depends(get_settings)):
+    market_data = await fetch_massive_market_data(settings, dashboard_tickers())
+    return get_dashboard_snapshot(market_data)
 
 
 @app.get("/api/me")

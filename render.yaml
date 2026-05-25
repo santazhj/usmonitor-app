@@ -33,6 +33,12 @@ services:
         sync: false
       - key: X_ALEABITOREDDIT_USER_ID
         sync: false
+      - key: MASSIVE_API_KEY
+        sync: false
+      - key: MASSIVE_BASE_URL
+        sync: false
+      - key: MASSIVE_CACHE_TTL_SECONDS
+        value: "60"
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

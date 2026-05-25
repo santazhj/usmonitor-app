@@ -40,6 +40,15 @@ class Settings:
     x_bearer_token: str = os.getenv("X_BEARER_TOKEN", "")
     x_aleabitoreddit_user_id: str = os.getenv("X_ALEABITOREDDIT_USER_ID", "")
 
+    massive_api_key: str = os.getenv("MASSIVE_API_KEY", "")
+    massive_base_url: str = os.getenv(
+        "MASSIVE_BASE_URL", "https://api.massive.com"
+    ).rstrip("/")
+    massive_cache_ttl_seconds: int = int(os.getenv("MASSIVE_CACHE_TTL_SECONDS", "60"))
+    massive_request_concurrency: int = int(
+        os.getenv("MASSIVE_REQUEST_CONCURRENCY", "12")
+    )
+
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     email_from: str = os.getenv(
         "EMAIL_FROM", "Serenity Alerts <alerts@example.com>"

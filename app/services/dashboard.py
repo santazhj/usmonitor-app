@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.models import utcnow
+from app.services.market_data import MarketDataResult
 
 
 def row(
@@ -695,9 +698,40 @@ WATCHLIST_CATEGORIES: list[dict] = [
 ]
 
 
-def get_dashboard_snapshot() -> dict:
+def dashboard_tickers() -> list[str]:
+    return [
+        item["ticker"]
+        for category in WATCHLIST_CATEGORIES
+        for item in category["rows"]
+    ]
+
+
+def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
+    market = market_rows.get(item["ticker"], {})
+    return {
+        "price": market.get("price"),
+        "change": market.get("change"),
+        "change_percent": market.get("change_percent"),
+        "volume": market.get("volume"),
+        "dollar_volume": market.get("dollar_volume"),
+        "market_cap": None,
+        "pe_ratio": None,
+        "revenue_growth": None,
+        "gross_margin": None,
+        "market_updated_at": market.get("updated_at"),
+        "market_provider": market.get("provider"),
+    }
+
+
+def get_dashboard_snapshot(market_data: MarketDataResult | None = None) -> dict:
+    market_rows = market_data.rows if market_data else {}
     rows = [
-        {**item, "category": category["slug"], "category_label": category["label"]}
+        {
+            **item,
+            **_market_payload(item, market_rows),
+            "category": category["slug"],
+            "category_label": category["label"],
+        }
         for category in WATCHLIST_CATEGORIES
         for item in category["rows"]
     ]
@@ -707,17 +741,34 @@ def get_dashboard_snapshot() -> dict:
         for item in rows
         if item["focus"] in {"High liquidity", "High attention"}
     )
+    if market_data and market_data.status == "live":
+        data_status = "market_live"
+        data_status_label = "Market data live"
+        market_status = "live"
+        market_detail = market_data.detail
+    elif market_data and market_data.status == "error":
+        data_status = "provider_error"
+        data_status_label = "Market data provider error"
+        market_status = "error"
+        market_detail = market_data.detail
+    else:
+        data_status = "provider_pending"
+        data_status_label = "Market data provider pending"
+        market_status = "pending"
+        market_detail = "Provider adapter is not connected yet."
+
     return {
         "generated_at": utcnow().isoformat(),
         "refresh_interval_seconds": 15,
-        "data_status": "provider_pending",
-        "data_status_label": "Market data provider pending",
+        "data_status": data_status,
+        "data_status_label": data_status_label,
         "disclaimer": "Information dashboard only. Not investment advice.",
         "metrics": {
             "tracked_tickers": len(rows),
             "categories": len(WATCHLIST_CATEGORIES),
             "core_chokepoints": core_count,
             "high_attention": high_attention_count,
+            "priced_tickers": len(market_rows),
         },
         "source_status": [
             {
@@ -732,8 +783,11 @@ def get_dashboard_snapshot() -> dict:
             },
             {
                 "name": "Market data",
-                "status": "pending",
-                "detail": "Provider adapter is not connected yet.",
+                "status": market_status,
+                "detail": market_detail,
+                "provider": "Massive",
+                "loaded_tickers": market_data.loaded_count if market_data else 0,
+                "eligible_tickers": market_data.eligible_count if market_data else 0,
             },
             {
                 "name": "Fundamentals",

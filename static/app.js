@@ -40,6 +40,7 @@ const COPY = {
     "dashboard.unavailable": "看板暂不可用",
     "metrics.tracked": "已跟踪",
     "metrics.categories": "分类",
+    "metrics.priced": "有行情",
     "metrics.core": "核心瓶颈",
     "metrics.attention": "高关注",
     "tabs.all": "全部",
@@ -47,6 +48,7 @@ const COPY = {
     "table.price": "价格",
     "table.change": "% 涨跌",
     "table.marketCap": "市值",
+    "table.volume": "成交量",
     "table.pe": "PE",
     "table.revGrowth": "收入增速",
     "table.grossMargin": "毛利率",
@@ -117,6 +119,7 @@ const COPY = {
     "dashboard.unavailable": "Dashboard unavailable",
     "metrics.tracked": "Tracked",
     "metrics.categories": "Categories",
+    "metrics.priced": "Priced",
     "metrics.core": "Core Chokepoints",
     "metrics.attention": "High Attention",
     "tabs.all": "All",
@@ -124,6 +127,7 @@ const COPY = {
     "table.price": "Price",
     "table.change": "% Chg",
     "table.marketCap": "Mkt Cap",
+    "table.volume": "Volume",
     "table.pe": "PE",
     "table.revGrowth": "Rev Growth",
     "table.grossMargin": "Gross Margin",
@@ -210,6 +214,8 @@ const VALUE_ZH = {
   "High-attention AI application and data-platform names for comparison.":
     "用于对照的高关注 AI 应用与数据平台标的。",
   "Market data provider pending": "行情数据源待接入",
+  "Market data live": "行情数据已接入",
+  "Market data provider error": "行情数据源错误",
   "Information dashboard only. Not investment advice.": "仅作信息看板，不构成投资建议。",
   "Demand anchor": "需求锚点",
   "Industry reference": "产业参考",
@@ -224,6 +230,7 @@ const VALUE_ZH = {
   "Niche/global": "小众/全球",
   "live": "已上线",
   "pending": "待接入",
+  "error": "错误",
   "Serenity Alert": "Serenity Alert",
   "X original-post monitor is deployed.": "X 原创帖监控已上线。",
   "AI chokepoint map": "AI 瓶颈地图",
@@ -348,6 +355,19 @@ function localizeRow(row, field) {
   return localizeValue(row[field]);
 }
 
+function localizeSourceDetail(source) {
+  if (currentLanguage !== "zh") return source.detail;
+  if (source.name === "Market data" && source.provider === "Massive") {
+    if (source.status === "live") {
+      return `Massive snapshot 已连接，已填充 ${source.loaded_tickers}/${source.eligible_tickers} 个美股标的。`;
+    }
+    if (source.status === "error") {
+      return "Massive snapshot 连接异常，暂未返回可用行情。";
+    }
+  }
+  return localizeValue(source.detail);
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -405,6 +425,35 @@ function formatDate(value) {
   );
 }
 
+function formatPrice(value) {
+  if (value === null || value === undefined) return "--";
+  return Number(value).toLocaleString("en-US", {
+    minimumFractionDigits: Number(value) >= 100 ? 2 : 3,
+    maximumFractionDigits: Number(value) >= 100 ? 2 : 4
+  });
+}
+
+function formatPercent(value) {
+  if (value === null || value === undefined) return "--";
+  const number = Number(value);
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${number.toFixed(2)}%`;
+}
+
+function formatCompactNumber(value) {
+  if (value === null || value === undefined) return "--";
+  return Number(value).toLocaleString("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1
+  });
+}
+
+function valueClass(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number === 0) return "";
+  return number > 0 ? "value-up" : "value-down";
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -432,7 +481,7 @@ function renderDashboard() {
 
   dashboardMetrics.innerHTML = [
     [t("metrics.tracked"), snapshot.metrics.tracked_tickers],
-    [t("metrics.categories"), snapshot.metrics.categories],
+    [t("metrics.priced"), snapshot.metrics.priced_tickers],
     [t("metrics.core"), snapshot.metrics.core_chokepoints],
     [t("metrics.attention"), snapshot.metrics.high_attention]
   ]
@@ -482,9 +531,12 @@ function renderDashboard() {
         localizeValue(row.focus)
       )}</small>
           </div>
-          <span class="pending-cell">${escapeHtml(t("table.pending"))}</span>
+          <span class="price-cell">${escapeHtml(formatPrice(row.price))}</span>
+          <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
+            ${escapeHtml(formatPercent(row.change_percent))}
+          </span>
           <span class="pending-cell">--</span>
-          <span class="pending-cell">--</span>
+          <span>${escapeHtml(formatCompactNumber(row.volume))}</span>
           <span class="pending-cell">--</span>
           <span class="pending-cell">--</span>
           <span class="pending-cell">--</span>
@@ -500,7 +552,7 @@ function renderDashboard() {
         <article class="source-item ${escapeHtml(source.status)}">
           <div>
             <strong>${escapeHtml(localizeValue(source.name))}</strong>
-            <span>${escapeHtml(localizeValue(source.detail))}</span>
+            <span>${escapeHtml(localizeSourceDetail(source))}</span>
           </div>
           <mark>${escapeHtml(localizeValue(source.status))}</mark>
         </article>`
@@ -697,6 +749,11 @@ applyStaticCopy();
 loadDashboard().catch(() => {
   dataStatus.textContent = t("dashboard.unavailable");
 });
+window.setInterval(() => {
+  loadDashboard().catch(() => {
+    dataStatus.textContent = t("dashboard.unavailable");
+  });
+}, 15_000);
 
 api("/api/me")
   .then(loadApp)
