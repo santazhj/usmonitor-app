@@ -406,7 +406,18 @@ async def analytics_event(
 
 
 @app.get("/api/me")
-async def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+async def me(
+    response: Response,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    session_token = sign_payload(
+        {"typ": "session", "uid": user.id},
+        settings.secret_key,
+        settings.session_ttl_seconds,
+    )
+    set_session_cookie(response, settings, session_token)
     subscription = active_subscription(db, user)
     return {
         "id": user.id,

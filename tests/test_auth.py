@@ -1,6 +1,7 @@
 import asyncio
 from urllib.parse import parse_qs, urlparse
 
+from fastapi import Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -8,6 +9,7 @@ from app.config import Settings
 from app.main import (
     AuthRequest,
     active_subscription,
+    me,
     request_login,
     session_cookie_domain,
     verify_login,
@@ -80,3 +82,20 @@ def test_localhost_session_cookie_has_no_domain():
     settings = Settings(base_url="http://localhost:8000", secret_key="test-secret")
 
     assert session_cookie_domain(settings) is None
+
+
+def test_me_renews_persistent_session_cookie():
+    db = make_session()
+    user = User(email="friend@example.com")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    settings = Settings(base_url="https://usmonitor.app", secret_key="test-secret")
+    response = Response()
+
+    result = asyncio.run(me(response=response, user=user, db=db, settings=settings))
+    cookie = response.headers["set-cookie"]
+
+    assert result["email"] == "friend@example.com"
+    assert "Max-Age=15552000" in cookie
+    assert "Domain=.usmonitor.app" in cookie
