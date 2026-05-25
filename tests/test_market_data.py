@@ -21,7 +21,14 @@ def test_normalize_snapshot_prefers_last_trade_price():
             "todaysChangePerc": -2.5,
             "todaysChange": -5.2,
             "updated": 1779494398645461153,
-            "day": {"v": 169339208, "dv": "169339208.6", "o": 220, "h": 221, "l": 214},
+            "day": {
+                "v": 169339208,
+                "dv": "169339208.6",
+                "vw": 216.8426,
+                "o": 220,
+                "h": 221,
+                "l": 214,
+            },
             "lastTrade": {"p": 214.2801},
             "min": {"c": 214.25},
             "prevDay": {"c": 219.51},
@@ -32,6 +39,7 @@ def test_normalize_snapshot_prefers_last_trade_price():
     assert normalized["price"] == 214.2801
     assert normalized["change_percent"] == -2.5
     assert normalized["volume"] == 169339208
+    assert normalized["dollar_volume"] == 169339208 * 216.8426
     assert normalized["updated_at"].startswith("2026-")
 
 

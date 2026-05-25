@@ -102,13 +102,22 @@ def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     day = snapshot.get("day") or {}
     prev_day = snapshot.get("prevDay") or {}
     minute = snapshot.get("min") or {}
+    price = _price(snapshot)
+    volume = _number(day.get("v") or minute.get("av") or minute.get("v"))
+    vwap = _number(day.get("vw") or minute.get("vw"))
+    raw_dollar_volume = _number(day.get("dv") or minute.get("dav"))
+    dollar_volume = raw_dollar_volume
+    if volume and (vwap or price):
+        computed_dollar_volume = volume * (vwap or price)
+        if dollar_volume is None or dollar_volume <= volume * 10:
+            dollar_volume = computed_dollar_volume
     return {
         "ticker": ticker,
-        "price": _price(snapshot),
+        "price": price,
         "change": _number(snapshot.get("todaysChange")),
         "change_percent": _number(snapshot.get("todaysChangePerc")),
-        "volume": _number(day.get("v") or minute.get("av") or minute.get("v")),
-        "dollar_volume": _number(day.get("dv") or minute.get("dav")),
+        "volume": volume,
+        "dollar_volume": dollar_volume,
         "open": _number(day.get("o")),
         "high": _number(day.get("h")),
         "low": _number(day.get("l")),
