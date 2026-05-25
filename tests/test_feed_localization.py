@@ -3,6 +3,7 @@ from app.models import AlertSummary, XPost
 from app.services.feed_localization import (
     LOCALIZATION_CACHE_KEY,
     LOCALIZATION_ROOT_KEY,
+    existing_chinese_payload,
     fallback_zh_payload,
     localize_feed_for_zh,
 )
@@ -62,3 +63,11 @@ def test_localize_feed_for_zh_caches_fallback_without_api_key():
     assert db.commits == 1
     cached = summary.post.raw_json[LOCALIZATION_ROOT_KEY][LOCALIZATION_CACHE_KEY]
     assert cached["notification_text"] == localized[summary.id]["notification_text"]
+
+
+def test_existing_chinese_payload_requires_chinese_notification_body():
+    summary = summary_with_english_post()
+    summary.title = "Serenity 新帖提醒"
+    summary.why_it_matters = "这是中文解释。"
+
+    assert existing_chinese_payload(summary) is None

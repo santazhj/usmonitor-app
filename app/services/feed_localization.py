@@ -74,15 +74,7 @@ def cache_zh(summary: AlertSummary, payload: dict[str, Any]) -> None:
 
 
 def existing_chinese_payload(summary: AlertSummary) -> dict[str, Any] | None:
-    text = " ".join(
-        [
-            summary.title or "",
-            summary.notification_text or "",
-            summary.why_it_matters or "",
-            " ".join(summary.bullets or []),
-        ]
-    )
-    if not has_chinese(text):
+    if not has_chinese(summary.notification_text or ""):
         return None
     return {
         "title": summary.title,
