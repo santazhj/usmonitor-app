@@ -351,7 +351,7 @@ h3 {
 .market-row {
   min-width: 1220px;
   display: grid;
-  grid-template-columns: 190px 86px 82px 108px 112px 68px 94px 225px 1fr;
+  grid-template-columns: 190px 86px 82px 108px 112px 68px 240px 1fr;
   gap: 10px;
   align-items: center;
 }
@@ -438,28 +438,17 @@ h3 {
   letter-spacing: 0;
 }
 
-.ticker-cell span,
-.ticker-cell small {
+.ticker-cell span {
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ticker-cell small {
-  color: var(--faint);
-  font-size: 11px;
-}
-
 .price-cell,
 .change-cell,
-.number-cell,
-.pending-cell {
+.number-cell {
   font-variant-numeric: tabular-nums;
-}
-
-.pending-cell {
-  color: var(--faint);
 }
 
 .value-up {
@@ -920,7 +909,7 @@ mark {
   .market-table-header,
   .market-row {
     min-width: 1120px;
-    grid-template-columns: 170px 78px 78px 96px 102px 60px 86px 200px 1fr;
+    grid-template-columns: 170px 78px 78px 96px 102px 60px 210px 1fr;
   }
 
   .payment-box div {

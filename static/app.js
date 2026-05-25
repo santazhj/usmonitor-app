@@ -66,7 +66,6 @@ const COPY = {
     "table.marketCap": "市值",
     "table.dollarVolume": "交易额",
     "table.pe": "PE",
-    "table.revGrowth": "收入增速",
     "table.aiRole": "AI 角色",
     "table.latestSignal": "最新观察",
     "table.pending": "待接入",
@@ -160,7 +159,6 @@ const COPY = {
     "table.marketCap": "Mkt Cap",
     "table.dollarVolume": "Dollar Vol",
     "table.pe": "PE",
-    "table.revGrowth": "Rev Growth",
     "table.aiRole": "AI Role",
     "table.latestSignal": "Latest Signal",
     "table.pending": "Pending",
@@ -688,9 +686,6 @@ function renderDashboard() {
             <div class="ticker-cell">
               <strong>${escapeHtml(row.ticker)}</strong>
               <span>${escapeHtml(row.company)}</span>
-              <small>${escapeHtml(localizeValue(row.tier))} | ${escapeHtml(
-          localizeValue(row.focus)
-        )}</small>
             </div>
             <span class="price-cell">${escapeHtml(formatPrice(row.price))}</span>
             <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
@@ -699,7 +694,6 @@ function renderDashboard() {
             <span class="number-cell">${escapeHtml(formatMarketCap(row.market_cap))}</span>
             <span class="number-cell">${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
             <span class="number-cell">${escapeHtml(formatRatio(row.pe_ratio))}</span>
-            <span class="pending-cell">--</span>
             <span>${escapeHtml(localizeRow(row, "role"))}</span>
             <span>${escapeHtml(localizeRow(row, "latest_signal"))}</span>
           </article>`
@@ -772,7 +766,6 @@ function renderTickerDrawer(ticker) {
     <section class="drawer-section">
       <span>${escapeHtml(t("drawer.positioning"))}</span>
       <p>${escapeHtml(localizeRow(row, "ai_layer"))}</p>
-      <p>${escapeHtml(localizeValue(row.tier))} | ${escapeHtml(localizeValue(row.focus))}</p>
     </section>
     <section class="drawer-section">
       <span>${escapeHtml(t("drawer.aiRole"))}</span>
