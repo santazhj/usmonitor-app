@@ -781,6 +781,8 @@ def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
         "revenue_growth": None,
         "market_updated_at": market.get("updated_at"),
         "market_provider": market.get("provider"),
+        "fundamentals_provider": market.get("fundamentals_provider"),
+        "fundamentals_currency": market.get("fundamentals_currency"),
         "currency": market.get("currency"),
         "exchange": market.get("exchange"),
     }
@@ -836,6 +838,14 @@ def get_dashboard_snapshot(
         market_status = "pending"
         market_detail = "Provider adapter is not connected yet."
 
+    fundamentals_count = market_data.fundamentals_loaded_count if market_data else 0
+    fundamentals_status = "live" if fundamentals_count else "pending"
+    fundamentals_detail = (
+        f"Low-frequency market cap and PE cache populated for {fundamentals_count} tickers."
+        if fundamentals_count
+        else "Low-frequency market cap and PE cache is waiting for provider data."
+    )
+
     return {
         "generated_at": utcnow().isoformat(),
         "refresh_interval_seconds": 15,
@@ -873,8 +883,8 @@ def get_dashboard_snapshot(
             },
             {
                 "name": "Fundamentals",
-                "status": "pending",
-                "detail": "Daily cache will be enabled with the market data provider.",
+                "status": fundamentals_status,
+                "detail": fundamentals_detail,
             },
         ],
         "categories": [

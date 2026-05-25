@@ -49,6 +49,10 @@ def test_dashboard_snapshot_merges_market_data():
     assert msft["dollar_volume"] == 6_180_000_000
     assert msft["market_cap"] == 3_100_000_000_000
     assert msft["pe_ratio"] == 29.8
+    fundamentals = next(
+        source for source in snapshot["source_status"] if source["name"] == "Fundamentals"
+    )
+    assert fundamentals["status"] == "pending"
 
 
 def test_dashboard_snapshot_includes_dynamic_positive_mentions():
@@ -74,6 +78,7 @@ def test_dashboard_snapshot_includes_dynamic_positive_mentions():
             },
             eligible_count=1,
             loaded_count=1,
+            fundamentals_loaded_count=1,
             detail="Yahoo Chart fallback populated 1/1 missing/global tickers.",
         ),
         dynamic_rows,
@@ -86,3 +91,7 @@ def test_dashboard_snapshot_includes_dynamic_positive_mentions():
     assert row["price"] == 12.5
     assert row["currency"] == "EUR"
     assert row["source_url"] == "https://x.com/aleabitoreddit/status/1"
+    fundamentals = next(
+        source for source in snapshot["source_status"] if source["name"] == "Fundamentals"
+    )
+    assert fundamentals["status"] == "live"

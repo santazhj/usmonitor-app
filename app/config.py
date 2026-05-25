@@ -48,6 +48,9 @@ class Settings:
     massive_fundamentals_cache_ttl_seconds: int = int(
         os.getenv("MASSIVE_FUNDAMENTALS_CACHE_TTL_SECONDS", str(6 * 60 * 60))
     )
+    yahoo_fundamentals_cache_ttl_seconds: int = int(
+        os.getenv("YAHOO_FUNDAMENTALS_CACHE_TTL_SECONDS", str(12 * 60 * 60))
+    )
     massive_request_concurrency: int = int(
         os.getenv("MASSIVE_REQUEST_CONCURRENCY", "12")
     )

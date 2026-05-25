@@ -546,6 +546,33 @@ function localizeCompany(row) {
 }
 
 function localizeSourceDetail(source) {
+  if (source.name === "Market data") {
+    if (source.status === "live") {
+      if (currentLanguage !== "zh") return source.detail;
+      const provider = source.provider || "";
+      const quoteFallback = provider.includes("Yahoo Chart")
+        ? "；非美股行情使用 Yahoo Chart fallback"
+        : "";
+      const fundamentalsFallback = provider.includes("Yahoo Quote")
+        ? "；PE/市值使用 Yahoo Quote 低频缓存"
+        : "";
+      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}${quoteFallback}${fundamentalsFallback}。`;
+    }
+    if (source.status === "error") {
+      return currentLanguage === "zh"
+        ? "Massive snapshot 连接异常，暂未返回可用行情。"
+        : source.detail;
+    }
+  }
+  if (source.name === "Fundamentals" && currentLanguage === "zh") {
+    if (source.status === "live") {
+      const count = source.detail.match(/for (\d+) tickers/)?.[1] || "";
+      return count
+        ? `PE/市值低频缓存已补全 ${count} 个标的。`
+        : "PE/市值低频缓存已接入。";
+    }
+    return "PE/市值低频缓存等待数据源返回。";
+  }
   if (currentLanguage !== "zh") return source.detail;
   if (source.name === "Market data" && source.provider?.includes("Massive")) {
     if (source.status === "live") {

@@ -38,6 +38,11 @@ _yahoo_cache: dict[str, Any] = {
     "expires_at": 0.0,
     "rows": {},
 }
+_yahoo_fundamentals_cache: dict[str, Any] = {
+    "key": "",
+    "expires_at": 0.0,
+    "rows": {},
+}
 
 
 def us_snapshot_tickers(tickers: list[str]) -> list[str]:
@@ -250,6 +255,74 @@ def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any
     }
 
 
+def _positive_number(*values: Any) -> float | int | None:
+    for value in values:
+        number = _number(value)
+        if number is not None and number > 0:
+            return number
+    return None
+
+
+def normalize_yahoo_quote_item(item: dict[str, Any]) -> dict[str, Any]:
+    ticker = item.get("symbol")
+    if not ticker:
+        return {}
+
+    market_cap = _number(item.get("marketCap"))
+    shares = _number(item.get("sharesOutstanding")) or _number(
+        item.get("impliedSharesOutstanding")
+    )
+    price = _number(item.get("regularMarketPrice"))
+    quote_currency = item.get("currency")
+    financial_currency = item.get("financialCurrency") or quote_currency
+    if market_cap is None and shares and price:
+        price_for_market_cap = price
+        if quote_currency in {"GBp", "GBX"} and financial_currency == "GBP":
+            price_for_market_cap = price / 100
+        market_cap = shares * price_for_market_cap
+
+    pe_ratio = _positive_number(
+        item.get("trailingPE"),
+        item.get("priceEpsCurrentYear"),
+        item.get("forwardPE"),
+    )
+
+    row = {
+        "ticker": ticker,
+        "market_cap": market_cap,
+        "weighted_shares_outstanding": shares,
+        "pe_ratio": pe_ratio,
+        "trailing_pe": _number(item.get("trailingPE")),
+        "forward_pe": _number(item.get("forwardPE")),
+        "price_eps_current_year": _number(item.get("priceEpsCurrentYear")),
+        "eps_trailing_twelve_months": _number(item.get("epsTrailingTwelveMonths")),
+        "eps_current_year": _number(item.get("epsCurrentYear")),
+        "fundamentals_currency": financial_currency,
+        "fundamentals_provider": "Yahoo Quote",
+    }
+    return {
+        key: value
+        for key, value in row.items()
+        if value is not None and value != ""
+    }
+
+
+def normalize_yahoo_quote(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    quote_response = payload.get("quoteResponse") if isinstance(payload, dict) else None
+    results = quote_response.get("result") if isinstance(quote_response, dict) else None
+    if not isinstance(results, list):
+        return {}
+    rows = {}
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        normalized = normalize_yahoo_quote_item(item)
+        ticker = normalized.get("ticker")
+        if ticker:
+            rows[ticker] = normalized
+    return rows
+
+
 async def fetch_dashboard_market_data(
     settings: Settings, tickers: list[str]
 ) -> MarketDataResult:
@@ -262,19 +335,61 @@ async def fetch_dashboard_market_data(
 
     if rows:
         yahoo_loaded = len([ticker for ticker in yahoo_rows if ticker in rows])
+        fundamentals_needed = [
+            ticker
+            for ticker, row in rows.items()
+            if row.get("market_cap") is None or row.get("pe_ratio") is None
+        ]
+        yahoo_fundamentals = await fetch_yahoo_quote_fundamentals(
+            settings, fundamentals_needed
+        )
+        yahoo_fundamentals_loaded = 0
+        for ticker, fundamentals in yahoo_fundamentals.items():
+            row = rows.get(ticker)
+            if row is None:
+                continue
+            before = (row.get("market_cap"), row.get("pe_ratio"))
+            for key, value in fundamentals.items():
+                if key == "ticker":
+                    continue
+                if key in {"market_cap", "pe_ratio"}:
+                    if row.get(key) is None and value is not None:
+                        row[key] = value
+                else:
+                    row.setdefault(key, value)
+            after = (row.get("market_cap"), row.get("pe_ratio"))
+            if after != before:
+                yahoo_fundamentals_loaded += 1
+
+        fundamentals_loaded = sum(
+            1
+            for row in rows.values()
+            if row.get("market_cap") is not None or row.get("pe_ratio") is not None
+        )
         detail = massive.detail
         if yahoo_loaded:
             detail = (
                 f"{detail} Yahoo Chart fallback populated "
                 f"{yahoo_loaded}/{len(missing)} missing/global tickers."
             )
+        if yahoo_fundamentals_loaded:
+            detail = (
+                f"{detail} Yahoo Quote fundamentals populated "
+                f"{yahoo_fundamentals_loaded}/{len(fundamentals_needed)} "
+                "market-cap/PE rows."
+            )
+        provider_parts = ["Massive"]
+        if yahoo_loaded:
+            provider_parts.append("Yahoo Chart")
+        if yahoo_fundamentals_loaded:
+            provider_parts.append("Yahoo Quote")
         return MarketDataResult(
-            provider="Massive + Yahoo Chart",
+            provider=" + ".join(provider_parts),
             status="live",
             rows=rows,
             eligible_count=len(tickers),
             loaded_count=len(rows),
-            fundamentals_loaded_count=massive.fundamentals_loaded_count,
+            fundamentals_loaded_count=fundamentals_loaded,
             detail=detail,
         )
 
@@ -336,6 +451,88 @@ async def _fetch_yahoo_chart_uncached(
                     rows[ticker] = normalized
 
         await asyncio.gather(*(fetch_one(ticker) for ticker in tickers))
+
+    return rows
+
+
+async def fetch_yahoo_quote_fundamentals(
+    settings: Settings, tickers: list[str]
+) -> dict[str, dict[str, Any]]:
+    requested = [ticker for ticker in dict.fromkeys(tickers) if ticker]
+    if not requested:
+        return {}
+
+    cache_key = ",".join(requested)
+    now = time.monotonic()
+    cached = _yahoo_fundamentals_cache.get("rows")
+    if (
+        _yahoo_fundamentals_cache.get("key") == cache_key
+        and isinstance(cached, dict)
+        and float(_yahoo_fundamentals_cache.get("expires_at", 0)) > now
+    ):
+        return cached
+
+    rows = await _fetch_yahoo_quote_fundamentals_uncached(settings, requested)
+    _yahoo_fundamentals_cache.update(
+        {
+            "key": cache_key,
+            "expires_at": now
+            + max(settings.yahoo_fundamentals_cache_ttl_seconds, 60 * 60),
+            "rows": rows,
+        }
+    )
+    return rows
+
+
+async def _fetch_yahoo_crumb(client: httpx.AsyncClient) -> str | None:
+    try:
+        await client.get("https://fc.yahoo.com")
+        await client.get("https://finance.yahoo.com")
+        response = await client.get("https://query1.finance.yahoo.com/v1/test/getcrumb")
+        if response.status_code != 200:
+            return None
+    except httpx.HTTPError:
+        return None
+    crumb = response.text.strip()
+    return crumb or None
+
+
+def _chunks(values: list[str], size: int) -> list[list[str]]:
+    return [values[index : index + size] for index in range(0, len(values), size)]
+
+
+async def _fetch_yahoo_quote_fundamentals_uncached(
+    settings: Settings, tickers: list[str]
+) -> dict[str, dict[str, Any]]:
+    headers = {"User-Agent": "Mozilla/5.0"}
+    rows: dict[str, dict[str, Any]] = {}
+
+    async with httpx.AsyncClient(
+        timeout=15, headers=headers, follow_redirects=True
+    ) as client:
+        crumb = await _fetch_yahoo_crumb(client)
+        if not crumb:
+            return {}
+
+        for batch in _chunks(tickers, 50):
+            try:
+                response = await client.get(
+                    "https://query1.finance.yahoo.com/v7/finance/quote",
+                    params={"symbols": ",".join(batch), "crumb": crumb},
+                )
+                if response.status_code == 401:
+                    crumb = await _fetch_yahoo_crumb(client)
+                    if not crumb:
+                        continue
+                    response = await client.get(
+                        "https://query1.finance.yahoo.com/v7/finance/quote",
+                        params={"symbols": ",".join(batch), "crumb": crumb},
+                    )
+                if response.status_code != 200:
+                    continue
+                rows.update(normalize_yahoo_quote(response.json()))
+            except (httpx.HTTPError, ValueError):
+                continue
 
     return rows
 

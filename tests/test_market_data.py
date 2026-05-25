@@ -3,6 +3,8 @@ from app.services.market_data import (
     normalize_snapshot,
     normalize_ticker_overview,
     normalize_yahoo_chart,
+    normalize_yahoo_quote,
+    normalize_yahoo_quote_item,
     us_snapshot_tickers,
 )
 
@@ -120,3 +122,45 @@ def test_normalize_yahoo_chart_extracts_global_quote():
     assert normalized["dollar_volume"] == 3827500 * 5300
     assert normalized["currency"] == "JPY"
     assert normalized["provider"] == "Yahoo Chart"
+
+
+def test_normalize_yahoo_quote_item_extracts_low_frequency_fundamentals():
+    normalized = normalize_yahoo_quote_item(
+        {
+            "symbol": "000660.KS",
+            "marketCap": 1_377_828_327_129_088,
+            "sharesOutstanding": 709_854_891,
+            "regularMarketPrice": 1_941_000,
+            "currency": "KRW",
+            "financialCurrency": "KRW",
+            "priceEpsCurrentYear": 6.568369,
+        }
+    )
+
+    assert normalized["ticker"] == "000660.KS"
+    assert normalized["market_cap"] == 1_377_828_327_129_088
+    assert normalized["weighted_shares_outstanding"] == 709_854_891
+    assert normalized["pe_ratio"] == 6.568369
+    assert normalized["fundamentals_currency"] == "KRW"
+    assert normalized["fundamentals_provider"] == "Yahoo Quote"
+
+
+def test_normalize_yahoo_quote_ignores_negative_pe_but_keeps_market_cap():
+    normalized = normalize_yahoo_quote(
+        {
+            "quoteResponse": {
+                "result": [
+                    {
+                        "symbol": "IQE.L",
+                        "marketCap": 448_296_128,
+                        "trailingPE": None,
+                        "forwardPE": -36.6,
+                        "priceEpsCurrentYear": -1828.5372,
+                    }
+                ]
+            }
+        }
+    )
+
+    assert normalized["IQE.L"]["market_cap"] == 448_296_128
+    assert "pe_ratio" not in normalized["IQE.L"]
