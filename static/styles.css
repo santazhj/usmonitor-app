@@ -437,9 +437,9 @@ h3 {
 
 .market-table-header,
 .market-row {
-  min-width: 1220px;
+  min-width: 980px;
   display: grid;
-  grid-template-columns: 190px 86px 82px 108px 112px 68px 240px 1fr;
+  grid-template-columns: 190px 86px 82px 108px 112px 68px minmax(260px, 1fr);
   gap: 10px;
   align-items: center;
 }
@@ -1148,8 +1148,8 @@ mark.success {
 
   .market-table-header,
   .market-row {
-    min-width: 1120px;
-    grid-template-columns: 170px 78px 78px 96px 102px 60px 210px 1fr;
+    min-width: 900px;
+    grid-template-columns: 170px 78px 78px 96px 102px 60px minmax(230px, 1fr);
   }
 
   .payment-box div {

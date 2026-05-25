@@ -1,5 +1,5 @@
 from app.models import WatchlistMention, utcnow
-from app.services.dashboard import get_dashboard_snapshot, mention_rows
+from app.services.dashboard import dashboard_tickers, get_dashboard_snapshot, mention_rows
 from app.services.market_data import MarketDataResult
 
 
@@ -15,6 +15,12 @@ def test_dashboard_snapshot_has_watchlist_structure():
         snapshot["rows"][0]
     )
     assert snapshot["metrics"]["priced_tickers"] == 0
+    assert not any(
+        row["ticker"].endswith((".SZ", ".SS", ".SH", ".BJ")) for row in snapshot["rows"]
+    )
+    assert not any(
+        ticker.endswith((".SZ", ".SS", ".SH", ".BJ")) for ticker in dashboard_tickers()
+    )
 
 
 def test_dashboard_snapshot_merges_market_data():
@@ -95,3 +101,15 @@ def test_dashboard_snapshot_includes_dynamic_positive_mentions():
         source for source in snapshot["source_status"] if source["name"] == "Fundamentals"
     )
     assert fundamentals["status"] == "live"
+
+
+def test_dashboard_excludes_dynamic_mainland_positive_mentions():
+    mention = WatchlistMention(
+        ticker="300308.SZ",
+        reason="Positive source mention.",
+        source_url="https://x.com/aleabitoreddit/status/2",
+        sentiment="positive",
+        created_at=utcnow(),
+    )
+
+    assert mention_rows([mention]) == []

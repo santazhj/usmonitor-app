@@ -6,6 +6,12 @@ from app.models import WatchlistMention
 from app.models import utcnow
 from app.services.market_data import MarketDataResult
 
+MAINLAND_LISTING_SUFFIXES = (".SZ", ".SS", ".SH", ".BJ")
+
+
+def is_mainland_listing(ticker: str) -> bool:
+    return ticker.upper().endswith(MAINLAND_LISTING_SUFFIXES)
+
 
 def row(
     ticker: str,
@@ -500,26 +506,6 @@ WATCHLIST_CATEGORIES: list[dict] = [
                 "Validation",
                 "Medium liquidity",
             ),
-            row(
-                "300502.SZ",
-                "Eoptolink",
-                "China",
-                "Optical Transceivers",
-                "China 800G/1.6T optical module exposure",
-                "Watch export constraints, overseas customers, and valuation",
-                "Validation",
-                "Global focus",
-            ),
-            row(
-                "300308.SZ",
-                "Zhongji Innolight",
-                "China",
-                "Optical Transceivers",
-                "High-attention China optical module supplier",
-                "Watch 800G/1.6T ramp, customer concentration, and policy risk",
-                "Validation",
-                "Global focus",
-            ),
         ],
     },
     {
@@ -710,6 +696,7 @@ def dashboard_tickers() -> list[str]:
         item["ticker"]
         for category in WATCHLIST_CATEGORIES
         for item in category["rows"]
+        if not is_mainland_listing(item["ticker"])
     ]
 
 
@@ -722,6 +709,7 @@ def static_rows() -> list[dict]:
         }
         for category in WATCHLIST_CATEGORIES
         for item in category["rows"]
+        if not is_mainland_listing(item["ticker"])
     ]
 
 
@@ -735,6 +723,8 @@ def mention_rows(mentions: list[WatchlistMention]) -> list[dict]:
     seen = set()
     for mention in mentions:
         ticker = mention.ticker.upper()
+        if is_mainland_listing(ticker):
+            continue
         if ticker in existing or ticker in seen:
             continue
         seen.add(ticker)

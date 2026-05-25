@@ -63,16 +63,6 @@ STATIC_GLOBAL_FUNDAMENTALS: dict[str, dict[str, Any]] = {
         "pe_ratio": 39.478058,
         "fundamentals_currency": "JPY",
     },
-    "300308.SZ": {
-        "market_cap": 1_211_586_183_168,
-        "pe_ratio": 81.25392,
-        "fundamentals_currency": "CNY",
-    },
-    "300502.SZ": {
-        "market_cap": 650_321_133_568,
-        "pe_ratio": 64.46199,
-        "fundamentals_currency": "CNY",
-    },
     "3037.TW": {
         "market_cap": 1_558_774_153_216,
         "pe_ratio": 227.06421,

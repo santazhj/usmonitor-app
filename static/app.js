@@ -353,8 +353,6 @@ const ROW_ZH = {
   "SOI.PA": ["SOI 衬底", "硅光和 SOI 材料敞口", "关注 CPO 采用率和 RF-SOI 复苏"],
   "IQE.L": ["外延", "化合物半导体外延敞口", "关注光子需求、盈利能力和融资风险"],
   TSEM: ["特色晶圆代工", "模拟和硅光晶圆代工敞口", "关注 AI 纯度和特色代工需求"],
-  "300502.SZ": ["光收发模块", "中国 800G/1.6T 光模块敞口", "关注出口限制、海外客户和估值"],
-  "300308.SZ": ["光收发模块", "高关注中国光模块供应商", "关注 800G/1.6T 放量、客户集中度和政策风险"],
   VRT: ["电力/热管理", "AI 数据中心电力和冷却的直接瓶颈", "关注 backlog、液冷和交付执行"],
   ETN: ["电气设备", "开关设备、变压器和配电敞口", "关注数据中心电气 backlog 和产能释放"],
   "SU.PA": ["电力管理", "欧洲核心数据中心电气化资产", "关注 AI 数据中心需求和欧洲周期敞口"],
@@ -417,8 +415,6 @@ const COMPANY_ZH = {
   "SOI.PA": "索泰克",
   "IQE.L": "IQE外延",
   TSEM: "高塔半导体",
-  "300502.SZ": "新易盛",
-  "300308.SZ": "中际旭创",
   VRT: "维谛技术",
   ETN: "伊顿",
   "SU.PA": "施耐德电气",
@@ -807,10 +803,8 @@ function rowMatchesSearch(row) {
     row.category_label,
     row.ai_layer,
     row.role,
-    row.latest_signal,
     localizeRow(row, "ai_layer"),
-    localizeRow(row, "role"),
-    localizeRow(row, "latest_signal")
+    localizeRow(row, "role")
   ]
     .join(" ")
     .toLowerCase();
@@ -923,7 +917,6 @@ function renderDashboard() {
             <span class="number-cell">${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
             <span class="number-cell">${escapeHtml(formatPERatio(row))}</span>
             <span>${escapeHtml(localizeRow(row, "role"))}</span>
-            <span>${escapeHtml(localizeRow(row, "latest_signal"))}</span>
           </article>`
       )
       .join("");
