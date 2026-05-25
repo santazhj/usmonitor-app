@@ -31,6 +31,7 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./serenity_alerts.db")
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-change-me")
     admin_emails: tuple[str, ...] = tuple(_list_env("ADMIN_EMAILS"))
+    cookie_domain: str = os.getenv("COOKIE_DOMAIN", "").strip()
 
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "").rstrip("/")
@@ -75,7 +76,9 @@ class Settings:
     send_initial_backfill: bool = _bool_env("SEND_INITIAL_BACKFILL", False)
 
     magic_link_ttl_seconds: int = 15 * 60
-    session_ttl_seconds: int = 30 * 24 * 60 * 60
+    session_ttl_seconds: int = int(
+        os.getenv("SESSION_TTL_SECONDS", str(180 * 24 * 60 * 60))
+    )
 
     @property
     def secure_cookies(self) -> bool:

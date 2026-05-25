@@ -283,6 +283,8 @@ def main() -> int:
         "DATABASE_URL": database_url,
         "PYTHON_VERSION": "3.12.8",
         "APP_BASE_URL": APP_BASE_URL,
+        "COOKIE_DOMAIN": settings.get("COOKIE_DOMAIN", ".usmonitor.app"),
+        "SESSION_TTL_SECONDS": settings.get("SESSION_TTL_SECONDS", str(180 * 24 * 60 * 60)),
         "OPENAI_API_KEY": settings["OPENAI_API_KEY"],
         "OPENAI_BASE_URL": settings.get("OPENAI_BASE_URL", ""),
         "OPENAI_SUMMARY_MODEL": settings.get("OPENAI_SUMMARY_MODEL", "gpt-5.4-mini"),

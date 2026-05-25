@@ -33,6 +33,7 @@ const SEARCH_KEY = "usmonitor.dashboard.search";
 const SORT_FIELD_KEY = "usmonitor.dashboard.sortField";
 const SORT_DIRECTION_KEY = "usmonitor.dashboard.sortDirection";
 const VISITOR_KEY = "usmonitor.visitorId";
+const LAST_EMAIL_KEY = "usmonitor.lastEmail";
 const DEFAULT_LANGUAGE = "zh";
 const DEFAULT_SORT_FIELD = "dollar_volume";
 const DEFAULT_SORT_DIRECTION = "desc";
@@ -104,6 +105,7 @@ const COPY = {
     "auth.openLogin": "打开登录",
     "auth.sent": "登录链接已发送。",
     "auth.failed": "登录失败，请检查邮箱。",
+    "auth.remembered": "已记住上次登录邮箱。为了安全，只有服务器登录状态有效时才会自动进入账户。",
     "account.eyebrow": "账户",
     "account.active": "已开通",
     "account.admin": "管理员权限已开通",
@@ -205,6 +207,7 @@ const COPY = {
     "auth.openLogin": "Open login",
     "auth.sent": "Login link sent.",
     "auth.failed": "Login failed. Check your email.",
+    "auth.remembered": "Last email remembered. For security, automatic account access only uses the server session.",
     "account.eyebrow": "Account",
     "account.active": "Active",
     "account.admin": "Admin access active",
@@ -650,12 +653,19 @@ function showSignedOut() {
   memberView.classList.add("hidden");
   logoutBtn.classList.add("hidden");
   adminLink.classList.add("hidden");
+  const rememberedEmail = localStorage.getItem(LAST_EMAIL_KEY) || "";
+  const emailInput = loginForm.querySelector('input[name="email"]');
+  if (rememberedEmail && emailInput && !emailInput.value) {
+    emailInput.value = rememberedEmail;
+    loginMessage.textContent = t("auth.remembered");
+  }
   updatePlanBadge(null);
 }
 
 function showSignedIn(me) {
   currentUser = me;
   authChecked = true;
+  localStorage.setItem(LAST_EMAIL_KEY, me.email);
   authView.classList.add("hidden");
   memberView.classList.remove("hidden");
   logoutBtn.classList.remove("hidden");
@@ -1225,6 +1235,10 @@ languageToggle.addEventListener("click", () => {
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(loginForm);
+  const email = String(form.get("email") || "").trim().toLowerCase();
+  if (email) {
+    localStorage.setItem(LAST_EMAIL_KEY, email);
+  }
   loginMessage.textContent = t("auth.sending");
   try {
     const result = await api("/api/auth/request", {

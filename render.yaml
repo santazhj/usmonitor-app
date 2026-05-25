@@ -19,6 +19,10 @@ services:
         generateValue: true
       - key: ADMIN_EMAILS
         sync: false
+      - key: COOKIE_DOMAIN
+        value: .usmonitor.app
+      - key: SESSION_TTL_SECONDS
+        value: "15552000"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_BASE_URL

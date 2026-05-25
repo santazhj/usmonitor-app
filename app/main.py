@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
@@ -59,6 +59,38 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Serenity Alerts", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def session_cookie_domain(settings: Settings) -> str | None:
+    if settings.cookie_domain:
+        return settings.cookie_domain
+    host = urlparse(settings.base_url).hostname or ""
+    if host == "usmonitor.app" or host.endswith(".usmonitor.app"):
+        return ".usmonitor.app"
+    return None
+
+
+def set_session_cookie(response: Response, settings: Settings, session_token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE,
+        session_token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite="lax",
+        max_age=settings.session_ttl_seconds,
+        domain=session_cookie_domain(settings),
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response, settings: Settings) -> None:
+    response.delete_cookie(
+        SESSION_COOKIE,
+        secure=settings.secure_cookies,
+        samesite="lax",
+        domain=session_cookie_domain(settings),
+        path="/",
+    )
 
 
 class AuthRequest(BaseModel):
@@ -298,21 +330,14 @@ async def verify_login(
         settings.session_ttl_seconds,
     )
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie(
-        SESSION_COOKIE,
-        session_token,
-        httponly=True,
-        secure=settings.secure_cookies,
-        samesite="lax",
-        max_age=settings.session_ttl_seconds,
-    )
+    set_session_cookie(response, settings, session_token)
     return response
 
 
 @app.post("/api/auth/logout")
-async def logout():
+async def logout(settings: Settings = Depends(get_settings)):
     response = Response(status_code=204)
-    response.delete_cookie(SESSION_COOKIE)
+    clear_session_cookie(response, settings)
     return response
 
 
