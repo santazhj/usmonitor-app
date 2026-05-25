@@ -5,6 +5,7 @@ from app.services.feed_localization import (
     existing_chinese_payload,
     fallback_zh_payload,
     localize_feed_for_zh,
+    payload_quality_ok,
 )
 
 
@@ -69,3 +70,31 @@ def test_existing_chinese_payload_requires_chinese_notification_body():
     summary.why_it_matters = "这是中文解释。"
 
     assert existing_chinese_payload(summary) is None
+
+
+def test_payload_quality_rejects_mixed_english_sentence_residue():
+    payload = {
+        "title": "Serenity 新帖提醒",
+        "notification_text": (
+            "作者这条帖子的意思是：$SIVE 还处在非常早期。And we're about to see "
+            "a ton of institutional inflow."
+        ),
+        "bullets": [],
+        "why_it_matters": "",
+    }
+
+    assert payload_quality_ok(payload) is False
+
+
+def test_payload_quality_allows_tickers_and_institution_names():
+    payload = {
+        "title": "Serenity 新帖提醒",
+        "notification_text": (
+            "作者认为 $SIVE.ST 还处在很早期，接下来可能看到 BlackRock、"
+            "Vanguard、MSCI 和 NASDAQ 相关资金流入。"
+        ),
+        "bullets": [],
+        "why_it_matters": "",
+    }
+
+    assert payload_quality_ok(payload) is True

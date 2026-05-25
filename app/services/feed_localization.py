@@ -14,12 +14,28 @@ from app.models import AlertSummary
 
 logger = logging.getLogger(__name__)
 
-LOCALIZATION_CACHE_KEY = "feed_zh_v2"
+LOCALIZATION_CACHE_KEY = "feed_zh_v3"
 LOCALIZATION_ROOT_KEY = "_serenity_localizations"
 TICKER_RE = re.compile(r"\$([A-Za-z][A-Za-z0-9.]{0,9})")
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 URL_RE = re.compile(r"https?://\S+")
 HANDLE_RE = re.compile(r"@\w+:?\s*")
+ENGLISH_RESIDUE_RE = re.compile(
+    r"\b("
+    r"we(?:'re| are) about to see|this is what it'?s like|did you listen|"
+    r"for people trying|valuation analysis|institutional inflow|"
+    r"index inclusion|deserve my own|netflix special|both vanguard|"
+    r"maybe for the first time|then,? couple that|with even more|"
+    r"about to see|trying to do|are probably valued"
+    r")\b",
+    re.IGNORECASE,
+)
+COMMON_ENGLISH_WORD_RE = re.compile(
+    r"\b(the|and|or|with|from|after|before|about|trying|people|see|"
+    r"probably|valued|early|inflow|entering|first|time|then|both|maybe|"
+    r"this|what|like|deserve|special|listen|anon)\b",
+    re.IGNORECASE,
+)
 
 
 class FeedLocalizationItem(BaseModel):
@@ -59,7 +75,7 @@ def cached_zh(summary: AlertSummary) -> dict[str, Any] | None:
     if not payload:
         return None
     required = {"title", "notification_text", "bullets", "why_it_matters"}
-    return payload if required <= set(payload) else None
+    return payload if required <= set(payload) and payload_quality_ok(payload) else None
 
 
 def cache_zh(summary: AlertSummary, payload: dict[str, Any]) -> None:
@@ -111,6 +127,54 @@ def _keyword_points(text: str) -> list[str]:
         if any(keyword in lower for keyword in keywords):
             points.append(label)
     return points[:3]
+
+
+def allowed_english_stripped(text: str) -> str:
+    stripped = re.sub(r"\$[A-Za-z][A-Za-z0-9.]{0,9}", " ", text or "")
+    allowed = [
+        "BlackRock",
+        "Blackrock",
+        "Vanguard",
+        "MSCI",
+        "NASDAQ",
+        "Nasdaq",
+        "S&P",
+        "Netflix",
+        "X",
+        "AI",
+        "CPO",
+        "LRO",
+        "HBM",
+        "GPU",
+        "ASIC",
+        "Ayar",
+        "Celestial",
+        "Lightmatter",
+        "Lighthorse",
+    ]
+    for word in allowed:
+        stripped = re.sub(rf"\b{re.escape(word)}\b", " ", stripped, flags=re.IGNORECASE)
+    return stripped
+
+
+def payload_quality_ok(payload: dict[str, Any]) -> bool:
+    text = " ".join(
+        [
+            str(payload.get("notification_text") or ""),
+            " ".join(str(item) for item in payload.get("bullets") or []),
+            str(payload.get("why_it_matters") or ""),
+        ]
+    )
+    if not has_chinese(text):
+        return False
+    stripped = allowed_english_stripped(text)
+    if ENGLISH_RESIDUE_RE.search(stripped):
+        return False
+    if COMMON_ENGLISH_WORD_RE.search(stripped):
+        return False
+    latin_letters = len(re.findall(r"[A-Za-z]", stripped))
+    cjk_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
+    return cjk_chars > 0 and latin_letters / max(cjk_chars, 1) < 0.08
 
 
 def clean_source_for_translation(text: str) -> str:
@@ -184,6 +248,26 @@ def _client_kwargs(settings: Settings) -> dict[str, Any]:
     return kwargs
 
 
+def _translation_model(settings: Settings) -> str:
+    return settings.openai_translation_model or settings.openai_summary_model
+
+
+def _validated_payloads(items: list[FeedLocalizationItem]) -> dict[str, dict[str, Any]]:
+    valid: dict[str, dict[str, Any]] = {}
+    for item in items:
+        payload = {
+            "title": item.title,
+            "notification_text": item.notification_text,
+            "bullets": item.bullets,
+            "why_it_matters": item.why_it_matters,
+        }
+        if payload_quality_ok(payload):
+            valid[item.id] = payload
+        else:
+            logger.warning("Rejected low-quality feed localization for %s", item.id)
+    return valid
+
+
 def generate_zh_batch(
     settings: Settings, summaries: list[AlertSummary]
 ) -> dict[str, dict[str, Any]]:
@@ -203,10 +287,14 @@ def generate_zh_batch(
         "你是 US Monitor 的中文金融情报翻译器。"
         "任务不是抽关键词，而是把每条 X 原帖的全段意思直接翻译/转述给中文用户。"
         "用户不懂英文，所以 notification_text 必须让用户不看原帖也能理解作者完整表达。"
+        "中文要像中国投资者日常会说的话，顺口、自然，不要翻译腔。"
         "保留股票代码、关键公司名、语气和因果关系；链接可概括为“附了链接”。"
         "不要写“原帖提到”、不要说“需要结合原帖”、不要让用户自己去看原帖。"
+        "除了股票代码、公司名、指数名、机构名之外，禁止保留英文句子或英文短语。"
+        "如果原文有 'we are about to see'，要译成“接下来可能会看到”。"
+        "如果原文有 'This is what it is like'，要译成“这就是这种阶段通常会发生的事情”。"
         "不要输出买卖建议、仓位建议或收益承诺。"
-        "notification_text 用自然中文，180-320 个中文字符；短帖可以更短。"
+        "notification_text 用自然中文，120-320 个中文字符；短帖可以更短。"
         "bullets 最多 3 条，用中文提炼核心含义。"
     )
     use_responses_api = "openrouter.ai" not in settings.openai_base_url.lower()
@@ -216,7 +304,7 @@ def generate_zh_batch(
 
             client = OpenAI(**_client_kwargs(settings))
             response = client.responses.parse(
-                model=settings.openai_summary_model,
+                model=_translation_model(settings),
                 input=[
                     {
                         "role": "system",
@@ -242,15 +330,7 @@ def generate_zh_batch(
                     if parsed:
                         parsed_items = parsed.items
                         break
-            return {
-                item.id: {
-                    "title": item.title,
-                    "notification_text": item.notification_text,
-                    "bullets": item.bullets,
-                    "why_it_matters": item.why_it_matters,
-                }
-                for item in parsed_items
-            }
+            return _validated_payloads(parsed_items)
         except Exception as exc:
             logger.warning("Responses feed localization failed: %s", exc.__class__.__name__)
 
@@ -259,7 +339,7 @@ def generate_zh_batch(
 
         client = OpenAI(**_client_kwargs(settings))
         response = client.chat.completions.create(
-            model=settings.openai_summary_model,
+            model=_translation_model(settings),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {
@@ -268,6 +348,8 @@ def generate_zh_batch(
                         "请返回严格 JSON，格式为 "
                         '{"items":[{"id":"...","title":"...","notification_text":"...",'
                         '"bullets":["..."],"why_it_matters":"..."}]}。'
+                        "再次强调：notification_text 必须是中国用户能直接读懂的自然中文，"
+                        "不得残留英文句子或英文短语。"
                         f"\n需要处理的 items:\n{json.dumps(items, ensure_ascii=False)}"
                     ),
                 },
@@ -277,15 +359,7 @@ def generate_zh_batch(
         content = response.choices[0].message.content or "{}"
         data = json.loads(content)
         parsed = FeedLocalizationBatch.model_validate(data)
-        return {
-            item.id: {
-                "title": item.title,
-                "notification_text": item.notification_text,
-                "bullets": item.bullets,
-                "why_it_matters": item.why_it_matters,
-            }
-            for item in parsed.items
-        }
+        return _validated_payloads(parsed.items)
     except Exception as exc:
         logger.warning("Chat feed localization failed: %s", exc.__class__.__name__)
         return {}

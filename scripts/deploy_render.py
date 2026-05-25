@@ -286,6 +286,10 @@ def main() -> int:
         "OPENAI_API_KEY": settings["OPENAI_API_KEY"],
         "OPENAI_BASE_URL": settings.get("OPENAI_BASE_URL", ""),
         "OPENAI_SUMMARY_MODEL": settings.get("OPENAI_SUMMARY_MODEL", "gpt-5.4-mini"),
+        "OPENAI_TRANSLATION_MODEL": settings.get(
+            "OPENAI_TRANSLATION_MODEL",
+            settings.get("OPENAI_SUMMARY_MODEL", "gpt-5.4-mini"),
+        ),
         "OPENAI_HTTP_REFERER": settings.get("OPENAI_HTTP_REFERER", APP_BASE_URL),
         "OPENAI_APP_TITLE": settings.get("OPENAI_APP_TITLE", "US Monitor"),
         "X_BEARER_TOKEN": settings["X_BEARER_TOKEN"],
