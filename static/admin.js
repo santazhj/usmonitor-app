@@ -124,6 +124,9 @@ async function loadOverview() {
           : item.is_admin
             ? "管理员旁路"
             : "未开通";
+        const switchTitle = item.is_admin
+          ? "管理员账号自动拥有高级权限，不能通过会员开关关闭。"
+          : "开通或关闭高级会员";
         return `
           <article class="admin-row user-row">
             <span>
@@ -138,7 +141,11 @@ async function loadOverview() {
             <span>${formatDuration(item.total_seconds)}</span>
             <span>${formatDate(item.last_seen_at || item.last_login_at)}</span>
             <span>
-              <label class="switch-control" title="开通或关闭高级会员">
+              <label
+                class="switch-control ${item.is_admin ? "admin-bypass-switch" : ""}"
+                title="${switchTitle}"
+                ${item.is_admin ? 'data-admin-bypass="true"' : ""}
+              >
                 <input
                   type="checkbox"
                   data-membership="${item.id}"
@@ -218,6 +225,13 @@ async function loadOverview() {
       });
       adminMessage.textContent = "付款已确认。";
       await loadOverview();
+    });
+  });
+
+  usersBox.querySelectorAll("[data-admin-bypass]").forEach((label) => {
+    label.addEventListener("click", () => {
+      adminMessage.textContent =
+        "管理员账号自动拥有高级权限，不需要也不能通过会员开关关闭。";
     });
   });
 

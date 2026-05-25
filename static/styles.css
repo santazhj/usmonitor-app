@@ -988,6 +988,15 @@ mark.success {
   opacity: 0.55;
 }
 
+.admin-bypass-switch input:disabled + i {
+  opacity: 1;
+  cursor: help;
+}
+
+.admin-bypass-switch input:disabled + i::after {
+  background: #7bbfa2;
+}
+
 .hidden {
   display: none !important;
 }
