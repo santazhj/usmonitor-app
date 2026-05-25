@@ -26,12 +26,17 @@ from app.models import (
     PushSubscription,
     Subscription,
     User,
+    WatchlistMention,
     utcnow,
 )
 from app.security import sign_payload, verify_payload
 from app.services.emailer import send_magic_link
-from app.services.dashboard import dashboard_tickers, get_dashboard_snapshot
-from app.services.market_data import fetch_massive_market_data
+from app.services.dashboard import (
+    dashboard_tickers,
+    get_dashboard_snapshot,
+    mention_rows,
+)
+from app.services.market_data import fetch_dashboard_market_data
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
 from app.services.seed import seed_defaults
@@ -322,9 +327,24 @@ async def public_config(settings: Settings = Depends(get_settings)):
 
 
 @app.get("/api/dashboard")
-async def dashboard(settings: Settings = Depends(get_settings)):
-    market_data = await fetch_massive_market_data(settings, dashboard_tickers())
-    return get_dashboard_snapshot(market_data)
+async def dashboard(
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    mentions = (
+        db.query(WatchlistMention)
+        .filter(
+            WatchlistMention.is_active.is_(True),
+            WatchlistMention.sentiment == "positive",
+        )
+        .order_by(WatchlistMention.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    dynamic_rows = mention_rows(mentions)
+    tickers = dashboard_tickers() + [item["ticker"] for item in dynamic_rows]
+    market_data = await fetch_dashboard_market_data(settings, tickers)
+    return get_dashboard_snapshot(market_data, dynamic_rows, mentions)
 
 
 @app.post("/api/analytics/event")

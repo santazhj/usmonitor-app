@@ -166,6 +166,29 @@ class AlertSummary(Base):
     deliveries: Mapped[list[Delivery]] = relationship(back_populates="summary")
 
 
+class WatchlistMention(Base):
+    __tablename__ = "watchlist_mentions"
+    __table_args__ = (
+        UniqueConstraint("summary_id", "ticker", name="uq_watchlist_summary_ticker"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    company: Mapped[str] = mapped_column(String(200), default="")
+    sentiment: Mapped[str] = mapped_column(String(32), default="positive", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(Text, default="")
+    post_id: Mapped[str | None] = mapped_column(ForeignKey("x_posts.id"), index=True)
+    summary_id: Mapped[str | None] = mapped_column(
+        ForeignKey("alert_summaries.id"), index=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    post: Mapped[XPost | None] = relationship()
+    summary: Mapped[AlertSummary | None] = relationship()
+
+
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
     __table_args__ = (UniqueConstraint("endpoint", name="uq_push_endpoint"),)

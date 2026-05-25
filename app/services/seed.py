@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.models import MonitorList, MonitoredSource
+from app.services.watchlist_mentions import backfill_positive_mentions
 
 
 def seed_defaults(db: Session, settings: Settings) -> None:
@@ -42,3 +43,4 @@ def seed_defaults(db: Session, settings: Settings) -> None:
         source.external_id = settings.x_aleabitoreddit_user_id
 
     db.commit()
+    backfill_positive_mentions(db)

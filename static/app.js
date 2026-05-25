@@ -81,6 +81,7 @@ const COPY = {
     "drawer.latestSignal": "最新观察",
     "drawer.positioning": "产业链定位",
     "drawer.updated": "行情更新",
+    "drawer.source": "来源",
     "rail.sourceEyebrow": "数据源状态",
     "rail.sourceTitle": "数据状态",
     "rail.alertsEyebrow": "提醒",
@@ -174,6 +175,7 @@ const COPY = {
     "drawer.latestSignal": "Latest Signal",
     "drawer.positioning": "Supply-chain position",
     "drawer.updated": "Market updated",
+    "drawer.source": "Source",
     "rail.sourceEyebrow": "Source Status",
     "rail.sourceTitle": "Data Status",
     "rail.alertsEyebrow": "Alerts",
@@ -233,7 +235,8 @@ const CATEGORY_ZH = {
   "Packaging & Substrate": "先进封装与载板",
   "Optical & Photonics": "光互连与光子",
   "Power & Cooling": "电力与冷却",
-  "Software & Data": "软件与数据"
+  "Software & Data": "软件与数据",
+  "Serenity Adds": "Serenity 动态加入"
 };
 
 const VALUE_ZH = {
@@ -253,6 +256,8 @@ const VALUE_ZH = {
     "开关设备、UPS、液冷、热管理系统与现场电力。",
   "High-attention AI application and data-platform names for comparison.":
     "用于对照的高关注 AI 应用与数据平台标的。",
+  "Tickers added from positive Serenity X-source analysis.":
+    "来自 Serenity X 来源正面分析后动态加入的标的。",
   "Market data provider pending": "行情数据源待接入",
   "Market data live": "行情数据已接入",
   "Market data provider error": "行情数据源错误",
@@ -268,6 +273,10 @@ const VALUE_ZH = {
   "Medium liquidity": "中等流动性",
   "Global focus": "全球关注",
   "Niche/global": "小众/全球",
+  "Serenity positive": "Serenity 正面提及",
+  "Source driven": "来源驱动",
+  "Positive source mention": "来源正面提及",
+  "Added from a constructive Serenity X-source post": "来自 Serenity X 来源的建设性正面帖子",
   "live": "已上线",
   "pending": "待接入",
   "error": "错误",
@@ -538,9 +547,12 @@ function localizeCompany(row) {
 
 function localizeSourceDetail(source) {
   if (currentLanguage !== "zh") return source.detail;
-  if (source.name === "Market data" && source.provider === "Massive") {
+  if (source.name === "Market data" && source.provider?.includes("Massive")) {
     if (source.status === "live") {
-      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}。`;
+      const fallback = source.provider?.includes("Yahoo")
+        ? "；非美股使用 Yahoo Chart 免费 fallback"
+        : "";
+      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}${fallback}。`;
     }
     if (source.status === "error") {
       return "Massive snapshot 连接异常，暂未返回可用行情。";
@@ -615,6 +627,12 @@ function formatPrice(value) {
     minimumFractionDigits: Number(value) >= 100 ? 2 : 3,
     maximumFractionDigits: Number(value) >= 100 ? 2 : 4
   });
+}
+
+function formatPriceWithCurrency(row) {
+  const price = formatPrice(row.price);
+  if (price === "--") return price;
+  return row.currency && row.currency !== "USD" ? `${price} ${row.currency}` : price;
 }
 
 function formatPercent(value) {
@@ -826,7 +844,7 @@ function renderDashboard() {
               <strong>${escapeHtml(row.ticker)}</strong>
               <span>${escapeHtml(localizeCompany(row))}</span>
             </div>
-            <span class="price-cell">${escapeHtml(formatPrice(row.price))}</span>
+            <span class="price-cell">${escapeHtml(formatPriceWithCurrency(row))}</span>
             <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
               ${escapeHtml(formatPercent(row.change_percent))}
             </span>
@@ -891,7 +909,7 @@ function renderTickerDrawer(ticker) {
       <span>${escapeHtml(localizeCompany(row))}</span>
     </div>
     <div class="drawer-metrics">
-      ${drawerMetric(t("table.price"), formatPrice(row.price))}
+      ${drawerMetric(t("table.price"), formatPriceWithCurrency(row))}
       ${drawerMetric(
         t("table.change"),
         formatPercent(row.change_percent),
@@ -913,7 +931,15 @@ function renderTickerDrawer(ticker) {
     <section class="drawer-section">
       <span>${escapeHtml(t("drawer.latestSignal"))}</span>
       <p>${escapeHtml(localizeRow(row, "latest_signal"))}</p>
-    </section>`;
+    </section>
+    ${
+      row.source_url
+        ? `<section class="drawer-section">
+            <span>${escapeHtml(t("drawer.source"))}</span>
+            <p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(row.source_url)}</a></p>
+          </section>`
+        : ""
+    }`;
   tickerDrawer.classList.remove("hidden");
   tickerDrawer.setAttribute("aria-hidden", "false");
 }

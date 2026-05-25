@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.models import WatchlistMention
 from app.models import utcnow
 from app.services.market_data import MarketDataResult
 
@@ -697,6 +698,12 @@ WATCHLIST_CATEGORIES: list[dict] = [
     },
 ]
 
+DYNAMIC_CATEGORY = {
+    "slug": "serenity-alert",
+    "label": "Serenity Adds",
+    "description": "Tickers added from positive Serenity X-source analysis.",
+}
+
 
 def dashboard_tickers() -> list[str]:
     return [
@@ -704,6 +711,61 @@ def dashboard_tickers() -> list[str]:
         for category in WATCHLIST_CATEGORIES
         for item in category["rows"]
     ]
+
+
+def static_rows() -> list[dict]:
+    return [
+        {
+            **item,
+            "category": category["slug"],
+            "category_label": category["label"],
+        }
+        for category in WATCHLIST_CATEGORIES
+        for item in category["rows"]
+    ]
+
+
+def static_ticker_set() -> set[str]:
+    return {item["ticker"] for item in static_rows()}
+
+
+def mention_rows(mentions: list[WatchlistMention]) -> list[dict]:
+    existing = static_ticker_set()
+    rows = []
+    seen = set()
+    for mention in mentions:
+        ticker = mention.ticker.upper()
+        if ticker in existing or ticker in seen:
+            continue
+        seen.add(ticker)
+        rows.append(
+            row(
+                ticker,
+                mention.company or ticker,
+                "Global",
+                "Serenity Alert",
+                "Positive source mention",
+                mention.reason or "Added from a constructive Serenity X-source post",
+                "Serenity positive",
+                "Source driven",
+            )
+            | {
+                "source_url": mention.source_url,
+                "source_added_at": mention.created_at.isoformat(),
+                "category": DYNAMIC_CATEGORY["slug"],
+                "category_label": DYNAMIC_CATEGORY["label"],
+            }
+        )
+    return rows
+
+
+def latest_mention_by_ticker(mentions: list[WatchlistMention]) -> dict[str, WatchlistMention]:
+    latest = {}
+    for mention in mentions:
+        ticker = mention.ticker.upper()
+        if ticker not in latest:
+            latest[ticker] = mention
+    return latest
 
 
 def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
@@ -719,20 +781,38 @@ def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
         "revenue_growth": None,
         "market_updated_at": market.get("updated_at"),
         "market_provider": market.get("provider"),
+        "currency": market.get("currency"),
+        "exchange": market.get("exchange"),
     }
 
 
-def get_dashboard_snapshot(market_data: MarketDataResult | None = None) -> dict:
+def get_dashboard_snapshot(
+    market_data: MarketDataResult | None = None,
+    extra_rows: list[dict] | None = None,
+    positive_mentions: list[WatchlistMention] | None = None,
+) -> dict:
     market_rows = market_data.rows if market_data else {}
+    extra_rows = extra_rows or []
+    positive_mentions = positive_mentions or []
+    mentions_by_ticker = latest_mention_by_ticker(positive_mentions)
+    base_rows = []
+    for item in static_rows():
+        mention = mentions_by_ticker.get(item["ticker"])
+        if mention:
+            item = {
+                **item,
+                "latest_signal": mention.reason or item["latest_signal"],
+                "source_url": mention.source_url,
+                "source_added_at": mention.created_at.isoformat(),
+            }
+        base_rows.append(item)
+
     rows = [
         {
             **item,
             **_market_payload(item, market_rows),
-            "category": category["slug"],
-            "category_label": category["label"],
         }
-        for category in WATCHLIST_CATEGORIES
-        for item in category["rows"]
+        for item in [*base_rows, *extra_rows]
     ]
     core_count = sum(1 for item in rows if item["tier"] == "Core chokepoint")
     high_attention_count = sum(
@@ -784,7 +864,7 @@ def get_dashboard_snapshot(market_data: MarketDataResult | None = None) -> dict:
                 "name": "Market data",
                 "status": market_status,
                 "detail": market_detail,
-                "provider": "Massive",
+                "provider": market_data.provider if market_data else "Massive",
                 "loaded_tickers": market_data.loaded_count if market_data else 0,
                 "eligible_tickers": market_data.eligible_count if market_data else 0,
                 "fundamentals_loaded": market_data.fundamentals_loaded_count
@@ -805,6 +885,16 @@ def get_dashboard_snapshot(market_data: MarketDataResult | None = None) -> dict:
                 "count": len(category["rows"]),
             }
             for category in WATCHLIST_CATEGORIES
-        ],
+        ]
+        + (
+            [
+                {
+                    **DYNAMIC_CATEGORY,
+                    "count": len(extra_rows),
+                }
+            ]
+            if extra_rows
+            else []
+        ),
         "rows": rows,
     }

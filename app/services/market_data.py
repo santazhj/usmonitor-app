@@ -33,6 +33,11 @@ _fundamentals_cache: dict[str, Any] = {
     "expires_at": 0.0,
     "rows": {},
 }
+_yahoo_cache: dict[str, Any] = {
+    "key": "",
+    "expires_at": 0.0,
+    "rows": {},
+}
 
 
 def us_snapshot_tickers(tickers: list[str]) -> list[str]:
@@ -162,6 +167,177 @@ def normalize_financials(payload: dict[str, Any]) -> dict[str, Any]:
         "financial_period": first.get("fiscal_period"),
         "financial_end_date": first.get("end_date"),
     }
+
+
+def _last_number(values: list[Any] | None) -> float | int | None:
+    if not values:
+        return None
+    for value in reversed(values):
+        number = _number(value)
+        if number is not None:
+            return number
+    return None
+
+
+def _previous_number(values: list[Any] | None) -> float | int | None:
+    if not values:
+        return None
+    found_last = False
+    for value in reversed(values):
+        number = _number(value)
+        if number is None:
+            continue
+        if found_last:
+            return number
+        found_last = True
+    return None
+
+
+def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
+    chart = payload.get("chart") if isinstance(payload, dict) else None
+    results = chart.get("result") if isinstance(chart, dict) else None
+    if not isinstance(results, list) or not results:
+        return {}
+    result = results[0]
+    meta = result.get("meta") if isinstance(result, dict) else {}
+    indicators = result.get("indicators") or {}
+    quote_list = indicators.get("quote") or []
+    quote = quote_list[0] if quote_list else {}
+
+    closes = quote.get("close")
+    price = _number(meta.get("regularMarketPrice")) or _last_number(closes)
+    previous_close = _previous_number(closes) or _number(meta.get("previousClose")) or _number(
+        meta.get("chartPreviousClose")
+    )
+    volume = _number(meta.get("regularMarketVolume")) or _last_number(
+        quote.get("volume")
+    )
+    change = price - previous_close if price is not None and previous_close else None
+    change_percent = (
+        (change / previous_close) * 100
+        if change is not None and previous_close
+        else None
+    )
+    timestamp = meta.get("regularMarketTime")
+    updated_at = None
+    if timestamp:
+        try:
+            updated_at = datetime.fromtimestamp(
+                int(timestamp), tz=timezone.utc
+            ).isoformat()
+        except (TypeError, ValueError, OSError):
+            updated_at = None
+
+    if price is None:
+        return {}
+
+    return {
+        "ticker": ticker,
+        "price": price,
+        "change": change,
+        "change_percent": change_percent,
+        "volume": volume,
+        "dollar_volume": volume * price if volume and price else None,
+        "open": _last_number(quote.get("open")),
+        "high": _last_number(quote.get("high")),
+        "low": _last_number(quote.get("low")),
+        "close": _last_number(quote.get("close")),
+        "previous_close": previous_close,
+        "updated_at": updated_at,
+        "currency": meta.get("currency"),
+        "exchange": meta.get("exchangeName"),
+        "provider": "Yahoo Chart",
+    }
+
+
+async def fetch_dashboard_market_data(
+    settings: Settings, tickers: list[str]
+) -> MarketDataResult:
+    massive = await fetch_massive_market_data(settings, tickers)
+    rows = dict(massive.rows)
+    missing = [ticker for ticker in tickers if ticker not in rows]
+    yahoo_rows = await fetch_yahoo_chart_market_data(settings, missing)
+    for ticker, row in yahoo_rows.items():
+        rows.setdefault(ticker, row)
+
+    if rows:
+        yahoo_loaded = len([ticker for ticker in yahoo_rows if ticker in rows])
+        detail = massive.detail
+        if yahoo_loaded:
+            detail = (
+                f"{detail} Yahoo Chart fallback populated "
+                f"{yahoo_loaded}/{len(missing)} missing/global tickers."
+            )
+        return MarketDataResult(
+            provider="Massive + Yahoo Chart",
+            status="live",
+            rows=rows,
+            eligible_count=len(tickers),
+            loaded_count=len(rows),
+            fundamentals_loaded_count=massive.fundamentals_loaded_count,
+            detail=detail,
+        )
+
+    return massive
+
+
+async def fetch_yahoo_chart_market_data(
+    settings: Settings, tickers: list[str]
+) -> dict[str, dict[str, Any]]:
+    requested = [ticker for ticker in dict.fromkeys(tickers) if ticker]
+    if not requested:
+        return {}
+
+    cache_key = ",".join(requested)
+    now = time.monotonic()
+    cached = _yahoo_cache.get("rows")
+    if (
+        _yahoo_cache.get("key") == cache_key
+        and isinstance(cached, dict)
+        and float(_yahoo_cache.get("expires_at", 0)) > now
+    ):
+        return cached
+
+    rows = await _fetch_yahoo_chart_uncached(settings, requested)
+    _yahoo_cache.update(
+        {
+            "key": cache_key,
+            "expires_at": now + max(settings.massive_cache_ttl_seconds, 30),
+            "rows": rows,
+        }
+    )
+    return rows
+
+
+async def _fetch_yahoo_chart_uncached(
+    settings: Settings, tickers: list[str]
+) -> dict[str, dict[str, Any]]:
+    semaphore = asyncio.Semaphore(max(settings.massive_request_concurrency, 1))
+    rows: dict[str, dict[str, Any]] = {}
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    async with httpx.AsyncClient(
+        base_url="https://query1.finance.yahoo.com", timeout=12, headers=headers
+    ) as client:
+
+        async def fetch_one(ticker: str) -> None:
+            async with semaphore:
+                try:
+                    response = await client.get(
+                        f"/v8/finance/chart/{ticker}",
+                        params={"range": "5d", "interval": "1d"},
+                    )
+                    if response.status_code != 200:
+                        return
+                    normalized = normalize_yahoo_chart(response.json(), ticker)
+                except (httpx.HTTPError, ValueError):
+                    return
+                if normalized:
+                    rows[ticker] = normalized
+
+        await asyncio.gather(*(fetch_one(ticker) for ticker in tickers))
+
+    return rows
 
 
 async def fetch_massive_market_data(

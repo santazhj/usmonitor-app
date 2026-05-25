@@ -13,23 +13,45 @@ class SummaryOutput(BaseModel):
     notification_text: str = Field(max_length=160)
     bullets: list[str] = Field(default_factory=list, max_length=5)
     tickers: list[str] = Field(default_factory=list, max_length=12)
+    positive_tickers: list[str] = Field(default_factory=list, max_length=12)
     why_it_matters: str = Field(max_length=500)
     risks: list[str] = Field(default_factory=list, max_length=4)
     source_url: str
 
 
 TICKER_RE = re.compile(r"\$([A-Za-z][A-Za-z0-9.]{0,9})")
+POSITIVE_RE = re.compile(
+    r"\b(long|bullish|buy|buying|own|owned|winner|beneficiary|upside|"
+    r"attractive|undervalued|breakout|accumulate|compounder|看好|正面|受益|"
+    r"低估|上行|多头|买入|赢家|弹性)\b",
+    re.IGNORECASE,
+)
+
+
+def normalize_ticker(value: str) -> str:
+    return value.strip().lstrip("$").upper()
+
+
+def positive_tickers_from_text(text: str, tickers: list[str]) -> list[str]:
+    normalized = sorted({normalize_ticker(ticker) for ticker in tickers if ticker})
+    if not normalized:
+        return []
+    if POSITIVE_RE.search(text):
+        return normalized
+    return []
 
 
 def fallback_summary(post: XPost, model: str = "fallback") -> SummaryOutput:
     text = " ".join(post.text.split())
     compact = text[:130] + ("..." if len(text) > 130 else "")
     tickers = sorted({match.upper() for match in TICKER_RE.findall(text)})
+    positive_tickers = positive_tickers_from_text(text, tickers)
     return SummaryOutput(
         title="Serenity 新帖提醒",
         notification_text=f"@{post.author_handle}: {compact}",
         bullets=[compact],
         tickers=tickers,
+        positive_tickers=positive_tickers,
         why_it_matters="这是监控源发布的新原创内容；当前为开发模式摘要，需要人工复核重点。",
         risks=["未调用模型生成深度摘要", "不构成投资建议"],
         source_url=post.url,
@@ -63,6 +85,9 @@ def summarize_post(settings: Settings, post: XPost) -> tuple[SummaryOutput, str]
                     "content": (
                         "你是 Serenity Alerts 的中文情报摘要器。输出简体中文，"
                         "只提炼信息、逻辑和风险，不给买卖指令、仓位建议或收益承诺。"
+                        "tickers 字段列出原帖明确提到的证券代码。positive_tickers 只列出"
+                        "作者明确正面评价、看好、做多、认为受益或给出建设性 bullish 分析的代码；"
+                        "排除仅作为比较、风险、负面或中性提到的代码。"
                     ),
                 },
                 {

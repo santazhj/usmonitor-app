@@ -11,6 +11,7 @@ from app.models import AlertSummary, JobRun, MonitoredSource, XPost, utcnow
 from app.services.push import deliver_summary_to_subscribers
 from app.services.seed import seed_defaults
 from app.services.summarizer import summarize_post
+from app.services.watchlist_mentions import sync_positive_mentions
 from app.services.x_client import XClient, is_substantive_original, parse_x_datetime
 
 
@@ -29,7 +30,14 @@ async def poll_sources(db: Session | None = None) -> dict:
     db.add(job)
     db.commit()
 
-    totals = {"sources": 0, "posts": 0, "summaries": 0, "sent": 0, "failed": 0}
+    totals = {
+        "sources": 0,
+        "posts": 0,
+        "summaries": 0,
+        "watchlist_mentions": 0,
+        "sent": 0,
+        "failed": 0,
+    }
     try:
         seed_defaults(db, settings)
         sources = (
@@ -103,6 +111,9 @@ async def poll_sources(db: Session | None = None) -> dict:
                 db.commit()
                 db.refresh(summary)
                 totals["summaries"] += 1
+                totals["watchlist_mentions"] += sync_positive_mentions(
+                    db, post, summary, output.positive_tickers
+                )
                 delivery_totals = deliver_summary_to_subscribers(db, settings, summary)
                 totals["sent"] += delivery_totals["sent"]
                 totals["failed"] += delivery_totals["failed"]

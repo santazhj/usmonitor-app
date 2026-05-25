@@ -2,6 +2,7 @@ from app.services.market_data import (
     normalize_financials,
     normalize_snapshot,
     normalize_ticker_overview,
+    normalize_yahoo_chart,
     us_snapshot_tickers,
 )
 
@@ -79,3 +80,43 @@ def test_normalize_financials_extracts_ttm_eps():
     assert normalized["ttm_diluted_eps"] == 16.79
     assert normalized["ttm_basic_eps"] == 16.86
     assert normalized["financial_period"] == "TTM"
+
+
+def test_normalize_yahoo_chart_extracts_global_quote():
+    normalized = normalize_yahoo_chart(
+        {
+            "chart": {
+                "result": [
+                    {
+                        "meta": {
+                            "currency": "JPY",
+                            "exchangeName": "JPX",
+                            "regularMarketPrice": 5300,
+                            "chartPreviousClose": 5178,
+                            "regularMarketTime": 1779456000,
+                        },
+                        "indicators": {
+                            "quote": [
+                                {
+                                    "open": [5243],
+                                    "high": [5332],
+                                    "low": [5183],
+                                    "close": [5300],
+                                    "volume": [3827500],
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        },
+        "2802.T",
+    )
+
+    assert normalized["ticker"] == "2802.T"
+    assert normalized["price"] == 5300
+    assert normalized["change"] == 122
+    assert round(normalized["change_percent"], 2) == 2.36
+    assert normalized["dollar_volume"] == 3827500 * 5300
+    assert normalized["currency"] == "JPY"
+    assert normalized["provider"] == "Yahoo Chart"
