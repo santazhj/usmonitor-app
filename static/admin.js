@@ -10,7 +10,6 @@ const pageStatsBox = document.querySelector("#pageStatsBox");
 const paymentsBox = document.querySelector("#paymentsBox");
 const sourcesBox = document.querySelector("#sourcesBox");
 const jobsBox = document.querySelector("#jobsBox");
-const pollBtn = document.querySelector("#pollBtn");
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -242,13 +241,6 @@ async function loadOverview() {
     });
   });
 }
-
-pollBtn.addEventListener("click", async () => {
-  adminMessage.textContent = "轮询中...";
-  const result = await api("/api/admin/poll", { method: "POST" });
-  adminMessage.textContent = `完成：${JSON.stringify(result)}`;
-  await loadOverview();
-});
 
 async function initAdmin() {
   try {

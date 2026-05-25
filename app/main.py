@@ -728,12 +728,6 @@ async def admin_update_membership(
     return {"ok": True, "active": False, "expires_at": None}
 
 
-@app.post("/api/admin/poll")
-async def admin_poll(_: User = Depends(current_admin), db: Session = Depends(get_db)):
-    result = await poll_sources(db)
-    return result
-
-
 @app.post("/api/jobs/poll")
 async def job_poll(
     secret: str,
