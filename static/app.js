@@ -348,6 +348,70 @@ const ROW_ZH = {
   FIG: ["设计软件", "产品设计协作和 AI 工作流敞口", "关注企业采用和 AI 设计工具竞争"]
 };
 
+const COMPANY_ZH = {
+  MSFT: "微软",
+  GOOGL: "谷歌母公司",
+  AMZN: "亚马逊",
+  META: "Meta平台公司",
+  ORCL: "甲骨文",
+  NBIS: "内比乌斯集团",
+  NVDA: "英伟达",
+  AMD: "超威半导体",
+  AVGO: "博通",
+  MRVL: "迈威尔科技",
+  ANET: "阿里斯塔网络",
+  ALAB: "阿斯特拉实验室",
+  CRDO: "科瑞多科技",
+  SMCI: "超微电脑",
+  DELL: "戴尔科技",
+  TSM: "台积电",
+  ASML: "阿斯麦",
+  AMAT: "应用材料",
+  LRCX: "泛林集团",
+  KLAC: "科磊",
+  "6857.T": "爱德万测试",
+  "BESI.AS": "贝思半导体",
+  MU: "美光科技",
+  "000660.KS": "SK海力士",
+  "005930.KS": "三星电子",
+  SNDK: "闪迪",
+  SIMO: "慧荣科技",
+  EWY: "韩国股票ETF",
+  "4062.T": "揖斐电",
+  "3037.TW": "欣兴电子",
+  "2802.T": "味之素",
+  "ATS.VI": "奥特斯",
+  AEHR: "艾尔测试系统",
+  COHR: "相干公司",
+  LITE: "朗美通",
+  FN: "法布里内特",
+  GLW: "康宁",
+  AAOI: "应用光电",
+  AXTI: "AXT材料",
+  "SIVE.ST": "西弗斯半导体",
+  "SOI.PA": "索泰克",
+  "IQE.L": "IQE外延",
+  TSEM: "高塔半导体",
+  "300502.SZ": "新易盛",
+  "300308.SZ": "中际旭创",
+  VRT: "维谛技术",
+  ETN: "伊顿",
+  "SU.PA": "施耐德电气",
+  NVT: "恩伟特",
+  MOD: "摩丁制造",
+  BE: "布鲁姆能源",
+  CEG: "星座能源",
+  GEV: "GE能源科技",
+  PWR: "昆塔服务",
+  XLU: "公用事业精选行业基金",
+  PLTR: "帕兰提尔",
+  SNOW: "雪花",
+  DDOG: "数据狗",
+  CRWD: "众击安全",
+  RDDT: "红迪",
+  FIG: "菲格玛"
+};
+
 let appConfig = {};
 let dashboardSnapshot = null;
 let selectedCategory = localStorage.getItem(CATEGORY_KEY) || "all";
@@ -396,6 +460,11 @@ function localizeRow(row, field) {
   const index = fields.indexOf(field);
   if (rowCopy && index !== -1) return rowCopy[index];
   return localizeValue(row[field]);
+}
+
+function localizeCompany(row) {
+  if (currentLanguage !== "zh") return row.company;
+  return COMPANY_ZH[row.ticker] || row.company;
 }
 
 function localizeSourceDetail(source) {
@@ -576,6 +645,7 @@ function rowMatchesSearch(row) {
   const haystack = [
     row.ticker,
     row.company,
+    localizeCompany(row),
     row.category_label,
     row.ai_layer,
     row.role,
@@ -685,7 +755,7 @@ function renderDashboard() {
           <article class="market-row" role="button" tabindex="0" data-ticker="${escapeHtml(row.ticker)}">
             <div class="ticker-cell">
               <strong>${escapeHtml(row.ticker)}</strong>
-              <span>${escapeHtml(row.company)}</span>
+              <span>${escapeHtml(localizeCompany(row))}</span>
             </div>
             <span class="price-cell">${escapeHtml(formatPrice(row.price))}</span>
             <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
@@ -749,7 +819,7 @@ function renderTickerDrawer(ticker) {
     <p class="drawer-kicker">${escapeHtml(localizeValue(row.category_label))}</p>
     <div class="drawer-title">
       <h2 id="drawerTitle">${escapeHtml(row.ticker)}</h2>
-      <span>${escapeHtml(row.company)}</span>
+      <span>${escapeHtml(localizeCompany(row))}</span>
     </div>
     <div class="drawer-metrics">
       ${drawerMetric(t("table.price"), formatPrice(row.price))}
