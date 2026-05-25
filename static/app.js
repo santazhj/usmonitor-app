@@ -1096,7 +1096,7 @@ async function loadPayment() {
 }
 
 async function loadFeed() {
-  const feed = await api("/api/feed");
+  const feed = await api(`/api/feed?lang=${encodeURIComponent(currentLanguage)}`);
   if (!feed.length) {
     feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.empty"))}</p>`;
     return;

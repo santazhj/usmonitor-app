@@ -36,6 +36,7 @@ from app.services.dashboard import (
     get_dashboard_snapshot,
     mention_rows,
 )
+from app.services.feed_localization import localize_feed_for_zh
 from app.services.market_data import fetch_dashboard_market_data
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
@@ -211,14 +212,15 @@ def revoke_membership(db: Session, user: User) -> None:
     db.commit()
 
 
-def serialize_summary(summary: AlertSummary) -> dict:
+def serialize_summary(summary: AlertSummary, localized: dict | None = None) -> dict:
+    localized = localized or {}
     return {
         "id": summary.id,
-        "title": summary.title,
-        "notification_text": summary.notification_text,
-        "bullets": summary.bullets,
+        "title": localized.get("title") or summary.title,
+        "notification_text": localized.get("notification_text") or summary.notification_text,
+        "bullets": localized.get("bullets") or summary.bullets,
         "tickers": summary.tickers,
-        "why_it_matters": summary.why_it_matters,
+        "why_it_matters": localized.get("why_it_matters") or summary.why_it_matters,
         "risks": summary.risks,
         "source_url": summary.source_url,
         "model": summary.model,
@@ -452,7 +454,9 @@ async def current_payment(
 async def feed(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
     limit: int = 30,
+    lang: str = "en",
 ):
     list_ids = accessible_monitor_list_ids(db, user)
     if not list_ids:
@@ -464,7 +468,12 @@ async def feed(
         .limit(min(max(limit, 1), 100))
         .all()
     )
-    return [serialize_summary(summary) for summary in summaries]
+    localized = (
+        localize_feed_for_zh(settings, db, summaries)
+        if lang.lower().startswith("zh")
+        else {}
+    )
+    return [serialize_summary(summary, localized.get(summary.id)) for summary in summaries]
 
 
 @app.post("/api/push/subscribe")
