@@ -106,7 +106,9 @@ const COPY = {
     "auth.failed": "登录失败，请检查邮箱。",
     "account.eyebrow": "账户",
     "account.active": "已开通",
-    "account.pending": "免费版",
+    "account.admin": "管理员权限已开通",
+    "account.noExpiry": "无固定到期日",
+    "account.pending": "普通版本",
     "account.waiting": "高级服务未开通",
     "push.eyebrow": "推送",
     "push.title": "iPhone PWA 推送",
@@ -205,7 +207,9 @@ const COPY = {
     "auth.failed": "Login failed. Check your email.",
     "account.eyebrow": "Account",
     "account.active": "Active",
-    "account.pending": "Free plan",
+    "account.admin": "Admin access active",
+    "account.noExpiry": "No fixed expiry",
+    "account.pending": "Free version",
     "account.waiting": "Premium not active",
     "push.eyebrow": "Push",
     "push.title": "iPhone PWA Push",
@@ -1023,18 +1027,22 @@ async function loadApp(existingMe) {
   showSignedIn(me);
   accountEmail.textContent = me.email;
 
-  const expires = me.subscription.expires_at
-    ? new Date(me.subscription.expires_at).toLocaleString(
-        currentLanguage === "zh" ? "zh-Hans" : "en-US"
-      )
-    : t("account.waiting");
-  subscriptionState.innerHTML = me.subscription.active
-    ? `<strong>${escapeHtml(t("account.active"))}</strong><span>${escapeHtml(
-        expires
-      )}</span>`
-    : `<strong>${escapeHtml(t("account.pending"))}</strong><span>${escapeHtml(
-        expires
-      )}</span>`;
+  let subscriptionTitle = t("account.pending");
+  let subscriptionDetail = t("account.waiting");
+  if (me.is_admin) {
+    subscriptionTitle = t("account.admin");
+    subscriptionDetail = t("account.noExpiry");
+  } else if (me.subscription.active) {
+    subscriptionTitle = t("account.active");
+    subscriptionDetail = me.subscription.expires_at
+      ? new Date(me.subscription.expires_at).toLocaleString(
+          currentLanguage === "zh" ? "zh-Hans" : "en-US"
+        )
+      : t("account.noExpiry");
+  }
+  subscriptionState.innerHTML = `<strong>${escapeHtml(
+    subscriptionTitle
+  )}</strong><span>${escapeHtml(subscriptionDetail)}</span>`;
 
   await Promise.all([loadLists(), loadPayment(), loadFeed()]);
   updatePushStatus();
