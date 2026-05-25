@@ -556,7 +556,10 @@ function localizeSourceDetail(source) {
       const fundamentalsFallback = provider.includes("Yahoo Quote")
         ? "；PE/市值使用 Yahoo Quote 低频缓存"
         : "";
-      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}${quoteFallback}${fundamentalsFallback}。`;
+      const staticFallback = provider.includes("Static Fundamentals")
+        ? "；部分 PE/市值使用静态低频兜底"
+        : "";
+      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}${quoteFallback}${fundamentalsFallback}${staticFallback}。`;
     }
     if (source.status === "error") {
       return currentLanguage === "zh"
@@ -690,6 +693,12 @@ function formatRatio(value) {
   return Number(value).toLocaleString("en-US", {
     maximumFractionDigits: 1
   });
+}
+
+function formatPERatio(row) {
+  if (row.pe_ratio !== null && row.pe_ratio !== undefined) return formatRatio(row.pe_ratio);
+  if (row.pe_note) return row.pe_note;
+  return "--";
 }
 
 function valueClass(value) {
@@ -877,7 +886,7 @@ function renderDashboard() {
             </span>
             <span class="number-cell">${escapeHtml(formatMarketCap(row.market_cap))}</span>
             <span class="number-cell">${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
-            <span class="number-cell">${escapeHtml(formatRatio(row.pe_ratio))}</span>
+            <span class="number-cell">${escapeHtml(formatPERatio(row))}</span>
             <span>${escapeHtml(localizeRow(row, "role"))}</span>
             <span>${escapeHtml(localizeRow(row, "latest_signal"))}</span>
           </article>`
@@ -944,7 +953,7 @@ function renderTickerDrawer(ticker) {
       )}
       ${drawerMetric(t("table.marketCap"), formatMarketCap(row.market_cap))}
       ${drawerMetric(t("table.dollarVolume"), formatCompactNumber(row.dollar_volume))}
-      ${drawerMetric(t("table.pe"), formatRatio(row.pe_ratio))}
+      ${drawerMetric(t("table.pe"), formatPERatio(row))}
       ${drawerMetric(t("drawer.updated"), formatDate(row.market_updated_at))}
     </div>
     <section class="drawer-section">

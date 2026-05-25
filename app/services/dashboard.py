@@ -778,6 +778,7 @@ def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
         "dollar_volume": market.get("dollar_volume"),
         "market_cap": market.get("market_cap"),
         "pe_ratio": market.get("pe_ratio"),
+        "pe_note": market.get("pe_note"),
         "revenue_growth": None,
         "market_updated_at": market.get("updated_at"),
         "market_provider": market.get("provider"),

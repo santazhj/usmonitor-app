@@ -44,6 +44,84 @@ _yahoo_fundamentals_cache: dict[str, Any] = {
     "rows": {},
 }
 
+# Last-resort low-frequency fundamentals for global watchlist names. These keep
+# the dashboard useful when Yahoo's crumb-gated quote endpoint is unavailable
+# from the production host.
+STATIC_GLOBAL_FUNDAMENTALS: dict[str, dict[str, Any]] = {
+    "000660.KS": {
+        "market_cap": 1_377_828_327_129_088,
+        "pe_ratio": 6.568369,
+        "fundamentals_currency": "KRW",
+    },
+    "005930.KS": {
+        "market_cap": 1_920_719_709_536_256,
+        "pe_ratio": 6.648751,
+        "fundamentals_currency": "KRW",
+    },
+    "2802.T": {
+        "market_cap": 5_225_828_581_376,
+        "pe_ratio": 39.478058,
+        "fundamentals_currency": "JPY",
+    },
+    "300308.SZ": {
+        "market_cap": 1_211_586_183_168,
+        "pe_ratio": 81.25392,
+        "fundamentals_currency": "CNY",
+    },
+    "300502.SZ": {
+        "market_cap": 650_321_133_568,
+        "pe_ratio": 64.46199,
+        "fundamentals_currency": "CNY",
+    },
+    "3037.TW": {
+        "market_cap": 1_558_774_153_216,
+        "pe_ratio": 227.06421,
+        "fundamentals_currency": "TWD",
+    },
+    "4062.T": {
+        "market_cap": 5_862_759_858_176,
+        "pe_ratio": 97.3794,
+        "fundamentals_currency": "JPY",
+    },
+    "6857.T": {
+        "market_cap": 20_187_493_433_344,
+        "pe_ratio": 54.277023,
+        "fundamentals_currency": "JPY",
+    },
+    "ATS.VI": {
+        "market_cap": 5_081_580_032,
+        "pe_ratio": 39.636364,
+        "fundamentals_currency": "EUR",
+    },
+    "BESI.AS": {
+        "market_cap": 21_673_144_320,
+        "pe_ratio": 142.5,
+        "fundamentals_currency": "EUR",
+    },
+    "IQE.L": {
+        "market_cap": 448_296_128,
+        "pe_note": "N/M",
+        "eps_trailing_twelve_months": -0.05,
+        "fundamentals_currency": "GBP",
+    },
+    "SIVE.ST": {
+        "market_cap": 21_617_383_424,
+        "pe_note": "N/M",
+        "eps_trailing_twelve_months": -0.81,
+        "fundamentals_currency": "SEK",
+    },
+    "SOI.PA": {
+        "market_cap": 6_334_940_160,
+        "pe_ratio": 633.3929,
+        "fundamentals_currency": "EUR",
+    },
+    "SU.PA": {
+        "market_cap": 151_380_787_200,
+        "pe_ratio": 33.80025,
+        "fundamentals_currency": "EUR",
+    },
+}
+
 
 def us_snapshot_tickers(tickers: list[str]) -> list[str]:
     """Massive's stock snapshot endpoint covers U.S. symbols and ETFs."""
@@ -286,12 +364,21 @@ def normalize_yahoo_quote_item(item: dict[str, Any]) -> dict[str, Any]:
         item.get("priceEpsCurrentYear"),
         item.get("forwardPE"),
     )
+    pe_note = None
+    if pe_ratio is None:
+        trailing_eps = _number(item.get("epsTrailingTwelveMonths"))
+        current_year_eps = _number(item.get("epsCurrentYear"))
+        if (trailing_eps is not None and trailing_eps <= 0) or (
+            current_year_eps is not None and current_year_eps <= 0
+        ):
+            pe_note = "N/M"
 
     row = {
         "ticker": ticker,
         "market_cap": market_cap,
         "weighted_shares_outstanding": shares,
         "pe_ratio": pe_ratio,
+        "pe_note": pe_note,
         "trailing_pe": _number(item.get("trailingPE")),
         "forward_pe": _number(item.get("forwardPE")),
         "price_eps_current_year": _number(item.get("priceEpsCurrentYear")),
@@ -323,6 +410,19 @@ def normalize_yahoo_quote(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return rows
 
 
+def static_global_fundamentals(tickers: list[str]) -> dict[str, dict[str, Any]]:
+    rows = {}
+    for ticker in dict.fromkeys(tickers):
+        fallback = STATIC_GLOBAL_FUNDAMENTALS.get(ticker)
+        if fallback:
+            rows[ticker] = {
+                **fallback,
+                "ticker": ticker,
+                "fundamentals_provider": "Static Global Fundamentals",
+            }
+    return rows
+
+
 async def fetch_dashboard_market_data(
     settings: Settings, tickers: list[str]
 ) -> MarketDataResult:
@@ -348,30 +448,69 @@ async def fetch_dashboard_market_data(
             row = rows.get(ticker)
             if row is None:
                 continue
-            before = (row.get("market_cap"), row.get("pe_ratio"))
+            before = (row.get("market_cap"), row.get("pe_ratio"), row.get("pe_note"))
             for key, value in fundamentals.items():
                 if key == "ticker":
                     continue
-                if key in {"market_cap", "pe_ratio"}:
+                if key in {"market_cap", "pe_ratio", "pe_note"}:
                     if row.get(key) is None and value is not None:
                         row[key] = value
                 else:
                     row.setdefault(key, value)
-            after = (row.get("market_cap"), row.get("pe_ratio"))
+            after = (row.get("market_cap"), row.get("pe_ratio"), row.get("pe_note"))
             if after != before:
                 yahoo_fundamentals_loaded += 1
+
+        static_needed = [
+            ticker
+            for ticker, row in rows.items()
+            if row.get("market_cap") is None
+            or (row.get("pe_ratio") is None and row.get("pe_note") is None)
+        ]
+        static_fundamentals = static_global_fundamentals(static_needed)
+        static_fundamentals_loaded = 0
+        for ticker, fundamentals in static_fundamentals.items():
+            row = rows.get(ticker)
+            if row is None:
+                continue
+            before = (row.get("market_cap"), row.get("pe_ratio"), row.get("pe_note"))
+            for key, value in fundamentals.items():
+                if key == "ticker":
+                    continue
+                if key in {"market_cap", "pe_ratio", "pe_note", "fundamentals_provider"}:
+                    if row.get(key) is None and value is not None:
+                        row[key] = value
+                else:
+                    row.setdefault(key, value)
+            after = (row.get("market_cap"), row.get("pe_ratio"), row.get("pe_note"))
+            if after != before:
+                static_fundamentals_loaded += 1
 
         fundamentals_loaded = sum(
             1
             for row in rows.values()
-            if row.get("market_cap") is not None or row.get("pe_ratio") is not None
+            if row.get("market_cap") is not None
+            or row.get("pe_ratio") is not None
+            or row.get("pe_note") is not None
         )
         yahoo_fundamentals_available = sum(
             1
             for row in rows.values()
             if row.get("fundamentals_provider") == "Yahoo Quote"
             and (
-                row.get("market_cap") is not None or row.get("pe_ratio") is not None
+                row.get("market_cap") is not None
+                or row.get("pe_ratio") is not None
+                or row.get("pe_note") is not None
+            )
+        )
+        static_fundamentals_available = sum(
+            1
+            for row in rows.values()
+            if row.get("fundamentals_provider") == "Static Global Fundamentals"
+            and (
+                row.get("market_cap") is not None
+                or row.get("pe_ratio") is not None
+                or row.get("pe_note") is not None
             )
         )
         detail = massive.detail
@@ -386,11 +525,18 @@ async def fetch_dashboard_market_data(
                 f"{yahoo_fundamentals_available}/{len(rows)} "
                 "market-cap/PE rows."
             )
+        if static_fundamentals_loaded or static_fundamentals_available:
+            detail = (
+                f"{detail} Static global fundamentals fallback populated "
+                f"{static_fundamentals_available}/{len(rows)} market-cap/PE rows."
+            )
         provider_parts = ["Massive"]
         if yahoo_loaded:
             provider_parts.append("Yahoo Chart")
         if yahoo_fundamentals_available:
             provider_parts.append("Yahoo Quote")
+        if static_fundamentals_available:
+            provider_parts.append("Static Fundamentals")
         return MarketDataResult(
             provider=" + ".join(provider_parts),
             status="live",

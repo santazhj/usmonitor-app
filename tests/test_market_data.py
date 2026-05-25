@@ -5,6 +5,7 @@ from app.services.market_data import (
     normalize_yahoo_chart,
     normalize_yahoo_quote,
     normalize_yahoo_quote_item,
+    static_global_fundamentals,
     us_snapshot_tickers,
 )
 
@@ -150,13 +151,14 @@ def test_normalize_yahoo_quote_ignores_negative_pe_but_keeps_market_cap():
         {
             "quoteResponse": {
                 "result": [
-                    {
-                        "symbol": "IQE.L",
-                        "marketCap": 448_296_128,
-                        "trailingPE": None,
-                        "forwardPE": -36.6,
-                        "priceEpsCurrentYear": -1828.5372,
-                    }
+                        {
+                            "symbol": "IQE.L",
+                            "marketCap": 448_296_128,
+                            "trailingPE": None,
+                            "forwardPE": -36.6,
+                            "priceEpsCurrentYear": -1828.5372,
+                            "epsTrailingTwelveMonths": -0.05,
+                        }
                 ]
             }
         }
@@ -164,3 +166,14 @@ def test_normalize_yahoo_quote_ignores_negative_pe_but_keeps_market_cap():
 
     assert normalized["IQE.L"]["market_cap"] == 448_296_128
     assert "pe_ratio" not in normalized["IQE.L"]
+    assert normalized["IQE.L"]["pe_note"] == "N/M"
+
+
+def test_static_global_fundamentals_covers_known_non_us_names():
+    rows = static_global_fundamentals(["000660.KS", "IQE.L", "UNKNOWN.X"])
+
+    assert rows["000660.KS"]["market_cap"]
+    assert rows["000660.KS"]["pe_ratio"]
+    assert rows["IQE.L"]["market_cap"]
+    assert rows["IQE.L"]["pe_note"] == "N/M"
+    assert "UNKNOWN.X" not in rows
