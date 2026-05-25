@@ -1,25 +1,26 @@
 :root {
-  color-scheme: dark;
-  --page: #0b1017;
-  --page-2: #101720;
-  --surface: #121a24;
-  --surface-2: #172231;
-  --surface-3: #1c2938;
-  --ink: #eef4f8;
-  --muted: #94a3b8;
-  --faint: #66758a;
-  --line: #263445;
-  --line-strong: #3a4b61;
-  --green: #34d399;
-  --green-soft: rgba(52, 211, 153, 0.12);
-  --red: #fb7185;
-  --red-soft: rgba(251, 113, 133, 0.12);
-  --amber: #fbbf24;
-  --amber-soft: rgba(251, 191, 36, 0.12);
-  --cyan: #22d3ee;
-  --cyan-soft: rgba(34, 211, 238, 0.12);
-  --blue: #60a5fa;
-  --shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+  color-scheme: light;
+  --page: #f5f7fa;
+  --page-2: #eef3f8;
+  --surface: #ffffff;
+  --surface-2: #f9fbfd;
+  --surface-3: #eef3f8;
+  --ink: #17212d;
+  --muted: #657487;
+  --faint: #8c9aac;
+  --line: #d9e1ea;
+  --line-strong: #bdc9d8;
+  --green: #11834a;
+  --green-soft: #eaf6ef;
+  --red: #c03945;
+  --red-soft: #f9eef0;
+  --amber: #9d6a18;
+  --amber-soft: #fff4df;
+  --cyan: #007d75;
+  --cyan-soft: #edf8f7;
+  --blue: #315fba;
+  --navy: #102033;
+  --shadow: 0 12px 28px rgba(33, 48, 63, 0.08);
 }
 
 * {
@@ -36,8 +37,8 @@ body {
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.42;
 }
 
 a {
@@ -61,8 +62,8 @@ input {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0d141d;
+  border-radius: 6px;
+  background: var(--surface);
   color: var(--ink);
   padding: 0 12px;
   outline: none;
@@ -94,15 +95,15 @@ p {
 }
 
 h1 {
-  margin-bottom: 8px;
-  font-size: clamp(28px, 3vw, 40px);
-  line-height: 1.06;
+  margin-bottom: 6px;
+  font-size: clamp(23px, 2vw, 28px);
+  line-height: 1.08;
   letter-spacing: 0;
 }
 
 h2 {
   margin-bottom: 0;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.18;
 }
 
@@ -112,38 +113,43 @@ h3 {
 }
 
 .shell {
-  width: min(1480px, calc(100vw - 28px));
+  width: min(1500px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 12px 0 36px;
+  padding: 14px 0 32px;
 }
 
 .topbar {
   position: sticky;
-  top: 0;
+  top: 8px;
   z-index: 20;
-  min-height: 56px;
+  min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(11, 16, 23, 0.92);
-  backdrop-filter: blur(14px);
-  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  margin-bottom: 14px;
+  padding: 0 14px;
+  box-shadow: 0 8px 22px rgba(33, 48, 63, 0.06);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   color: var(--ink);
   font-weight: 780;
   text-decoration: none;
 }
 
 .brand img {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: var(--cyan);
 }
 
 .nav-actions,
@@ -162,6 +168,21 @@ h3 {
   text-decoration: none;
 }
 
+.quiet-link {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0 10px;
+}
+
+.nav-actions .quiet-link[href="#dashboard"] {
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
 .quiet-link:hover,
 .text-button:hover {
   color: var(--ink);
@@ -170,19 +191,19 @@ h3 {
 .lang-toggle {
   min-width: 52px;
   border: 1px solid var(--line);
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--ink);
   font-weight: 750;
 }
 
 .primary {
   background: var(--cyan);
-  color: #061015;
+  color: #ffffff;
   font-weight: 720;
 }
 
 .primary:hover {
-  background: #67e8f9;
+  background: #006b64;
 }
 
 .secondary {
@@ -197,7 +218,7 @@ h3 {
 
 .dashboard-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 350px;
+  grid-template-columns: minmax(0, 1fr) 356px;
   gap: 14px;
   align-items: start;
 }
@@ -210,10 +231,14 @@ h3 {
 
 .dashboard-heading {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 230px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 18px;
   align-items: stretch;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 16px;
 }
 
 .lede {
@@ -228,32 +253,42 @@ h3 {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 
 .refresh-card {
   display: grid;
   align-content: center;
-  gap: 4px;
-  padding: 14px;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .refresh-card span,
 .refresh-card small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .refresh-card strong {
   color: var(--cyan);
   line-height: 1.15;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  padding: 0 10px;
 }
 
 .metric-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .metric-strip article,
@@ -262,33 +297,33 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 4px;
-  min-height: 74px;
+  gap: 5px;
+  min-height: 92px;
   padding: 12px;
 }
 
 .metric-strip span,
 .metrics-grid span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 740;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
 .metric-strip strong,
 .metrics-grid strong {
-  color: var(--ink);
-  font-size: 22px;
+  color: var(--navy);
+  font-size: 25px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .dashboard-command {
   display: grid;
-  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 390px) minmax(0, 1fr);
   gap: 12px;
   align-items: end;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .search-box {
@@ -296,9 +331,9 @@ h3 {
 }
 
 .search-box span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 760;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
@@ -314,25 +349,28 @@ h3 {
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  justify-content: flex-end;
 }
 
 .category-tabs button {
-  min-width: 118px;
+  min-width: auto;
+  min-height: 36px;
   display: inline-flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  background: var(--surface-2);
+  background: var(--surface);
   border-color: var(--line);
-  color: var(--ink);
+  color: var(--muted);
   white-space: nowrap;
 }
 
 .category-tabs button.active {
   background: var(--cyan-soft);
-  border-color: rgba(34, 211, 238, 0.48);
+  border-color: rgba(0, 125, 117, 0.4);
   color: var(--cyan);
+  font-weight: 760;
 }
 
 .category-tabs small {
@@ -343,7 +381,7 @@ h3 {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: none;
   overflow-x: auto;
 }
 
@@ -360,22 +398,22 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 2;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 12px;
-  background: #111a25;
+  background: var(--surface-3);
   border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 760;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
 .market-table-header span,
 .table-sort {
   min-width: 0;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 760;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 850;
   text-align: left;
   text-transform: uppercase;
 }
@@ -418,7 +456,7 @@ h3 {
 
 .market-row:hover,
 .market-row:focus {
-  background: rgba(34, 211, 238, 0.06);
+  background: #fbfcfe;
   outline: none;
 }
 
@@ -433,7 +471,7 @@ h3 {
 }
 
 .ticker-cell strong {
-  color: var(--ink);
+  color: var(--navy);
   font-size: 15px;
   letter-spacing: 0;
 }
@@ -472,7 +510,7 @@ h3 {
 
 .rail-panel,
 .panel {
-  padding: 15px;
+  padding: 14px;
 }
 
 .section-title,
@@ -483,9 +521,9 @@ h3 {
 
 .eyebrow {
   margin: 0;
-  color: var(--amber);
-  font-size: 11px;
-  font-weight: 800;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
@@ -502,7 +540,7 @@ h3 {
 .list-item,
 .alert-card,
 .table-row {
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 11px;
@@ -691,7 +729,7 @@ mark.success {
 .drawer-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(2, 6, 12, 0.68);
+  background: rgba(16, 32, 51, 0.36);
 }
 
 .drawer-panel {
@@ -702,8 +740,8 @@ mark.success {
   height: 100%;
   overflow-y: auto;
   border-left: 1px solid var(--line);
-  background: #0f1721;
-  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.36);
+  background: var(--surface);
+  box-shadow: -20px 0 60px rgba(33, 48, 63, 0.18);
   padding: 22px;
 }
 
@@ -714,7 +752,7 @@ mark.success {
   width: 36px;
   min-height: 36px;
   border: 1px solid var(--line);
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--muted);
   font-size: 22px;
   line-height: 1;
@@ -727,9 +765,9 @@ mark.success {
 
 .drawer-kicker {
   margin-bottom: 8px;
-  color: var(--amber);
-  font-size: 11px;
-  font-weight: 800;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
@@ -858,7 +896,7 @@ mark.success {
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   padding: 10px 12px;
 }
 
@@ -998,12 +1036,26 @@ mark.success {
   }
 
   .topbar {
-    align-items: flex-start;
-    padding-bottom: 12px;
+    top: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .nav-actions {
-    justify-content: flex-end;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .quiet-link,
+  .text-button {
+    flex: 0 0 auto;
   }
 
   .metric-strip,
@@ -1016,6 +1068,14 @@ mark.success {
 
   .metric-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-heading {
+    padding: 14px;
+  }
+
+  .category-tabs {
+    justify-content: flex-start;
   }
 
   .refresh-card {

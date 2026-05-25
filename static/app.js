@@ -814,7 +814,7 @@ function renderDashboard() {
   });
 
   dashboardMetrics.innerHTML = [
-    [t("metrics.market"), localizeValue(snapshot.data_status_label)],
+    [t("metrics.tracked"), snapshot.metrics.tracked_tickers],
     [t("metrics.priced"), snapshot.metrics.priced_tickers],
     [t("metrics.fundamentals"), fundamentalsLabel(snapshot)],
     [t("metrics.core"), snapshot.metrics.core_chokepoints],
