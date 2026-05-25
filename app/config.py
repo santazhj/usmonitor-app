@@ -44,7 +44,10 @@ class Settings:
     massive_base_url: str = os.getenv(
         "MASSIVE_BASE_URL", "https://api.massive.com"
     ).rstrip("/")
-    massive_cache_ttl_seconds: int = int(os.getenv("MASSIVE_CACHE_TTL_SECONDS", "60"))
+    massive_cache_ttl_seconds: int = int(os.getenv("MASSIVE_CACHE_TTL_SECONDS", "75"))
+    massive_fundamentals_cache_ttl_seconds: int = int(
+        os.getenv("MASSIVE_FUNDAMENTALS_CACHE_TTL_SECONDS", str(6 * 60 * 60))
+    )
     massive_request_concurrency: int = int(
         os.getenv("MASSIVE_REQUEST_CONCURRENCY", "12")
     )

@@ -48,10 +48,9 @@ const COPY = {
     "table.price": "价格",
     "table.change": "% 涨跌",
     "table.marketCap": "市值",
-    "table.volume": "成交量",
+    "table.dollarVolume": "交易额",
     "table.pe": "PE",
     "table.revGrowth": "收入增速",
-    "table.grossMargin": "毛利率",
     "table.aiRole": "AI 角色",
     "table.latestSignal": "最新观察",
     "table.pending": "待接入",
@@ -127,10 +126,9 @@ const COPY = {
     "table.price": "Price",
     "table.change": "% Chg",
     "table.marketCap": "Mkt Cap",
-    "table.volume": "Volume",
+    "table.dollarVolume": "Dollar Vol",
     "table.pe": "PE",
     "table.revGrowth": "Rev Growth",
-    "table.grossMargin": "Gross Margin",
     "table.aiRole": "AI Role",
     "table.latestSignal": "Latest Signal",
     "table.pending": "Pending",
@@ -359,7 +357,7 @@ function localizeSourceDetail(source) {
   if (currentLanguage !== "zh") return source.detail;
   if (source.name === "Market data" && source.provider === "Massive") {
     if (source.status === "live") {
-      return `Massive snapshot 已连接，已填充 ${source.loaded_tickers}/${source.eligible_tickers} 个美股标的。`;
+      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}。`;
     }
     if (source.status === "error") {
       return "Massive snapshot 连接异常，暂未返回可用行情。";
@@ -444,6 +442,21 @@ function formatCompactNumber(value) {
   if (value === null || value === undefined) return "--";
   return Number(value).toLocaleString("en-US", {
     notation: "compact",
+    maximumFractionDigits: 1
+  });
+}
+
+function formatMarketCap(value) {
+  if (value === null || value === undefined) return "--";
+  return Number(value).toLocaleString("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2
+  });
+}
+
+function formatRatio(value) {
+  if (value === null || value === undefined) return "--";
+  return Number(value).toLocaleString("en-US", {
     maximumFractionDigits: 1
   });
 }
@@ -535,10 +548,9 @@ function renderDashboard() {
           <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
             ${escapeHtml(formatPercent(row.change_percent))}
           </span>
-          <span class="pending-cell">--</span>
-          <span>${escapeHtml(formatCompactNumber(row.volume))}</span>
-          <span class="pending-cell">--</span>
-          <span class="pending-cell">--</span>
+          <span>${escapeHtml(formatMarketCap(row.market_cap))}</span>
+          <span>${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
+          <span>${escapeHtml(formatRatio(row.pe_ratio))}</span>
           <span class="pending-cell">--</span>
           <span>${escapeHtml(localizeRow(row, "role"))}</span>
           <span>${escapeHtml(localizeRow(row, "latest_signal"))}</span>

@@ -38,7 +38,9 @@ services:
       - key: MASSIVE_BASE_URL
         sync: false
       - key: MASSIVE_CACHE_TTL_SECONDS
-        value: "60"
+        value: "75"
+      - key: MASSIVE_FUNDAMENTALS_CACHE_TTL_SECONDS
+        value: "21600"
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

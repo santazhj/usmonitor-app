@@ -18,6 +18,7 @@ class MarketDataResult:
     rows: dict[str, dict[str, Any]]
     eligible_count: int = 0
     loaded_count: int = 0
+    fundamentals_loaded_count: int = 0
     detail: str = ""
 
 
@@ -27,6 +28,11 @@ _cache: dict[str, Any] = {
     "result": None,
 }
 _cache_lock = asyncio.Lock()
+_fundamentals_cache: dict[str, Any] = {
+    "key": "",
+    "expires_at": 0.0,
+    "rows": {},
+}
 
 
 def us_snapshot_tickers(tickers: list[str]) -> list[str]:
@@ -113,6 +119,42 @@ def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _field_value(block: dict[str, Any], field: str) -> float | int | None:
+    node = block.get(field)
+    if isinstance(node, dict):
+        return _number(node.get("value"))
+    return None
+
+
+def normalize_ticker_overview(payload: dict[str, Any]) -> dict[str, Any]:
+    result = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(result, dict):
+        return {}
+    return {
+        "market_cap": _number(result.get("market_cap")),
+        "weighted_shares_outstanding": _number(result.get("weighted_shares_outstanding")),
+    }
+
+
+def normalize_financials(payload: dict[str, Any]) -> dict[str, Any]:
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list) or not results:
+        return {}
+    first = results[0]
+    financials = first.get("financials") if isinstance(first, dict) else None
+    if not isinstance(financials, dict):
+        return {}
+    income = financials.get("income_statement") or {}
+    diluted_eps = _field_value(income, "diluted_earnings_per_share")
+    basic_eps = _field_value(income, "basic_earnings_per_share")
+    return {
+        "ttm_diluted_eps": diluted_eps,
+        "ttm_basic_eps": basic_eps,
+        "financial_period": first.get("fiscal_period"),
+        "financial_end_date": first.get("end_date"),
+    }
+
+
 async def fetch_massive_market_data(
     settings: Settings, tickers: list[str]
 ) -> MarketDataResult:
@@ -159,7 +201,7 @@ async def _fetch_uncached(settings: Settings, tickers: list[str]) -> MarketDataR
     base_url = _normalize_base_url(settings.massive_base_url)
     full_result = await _fetch_full_snapshot(settings, base_url, tickers)
     if full_result.status == "live":
-        return full_result
+        return await _with_fundamentals(settings, base_url, tickers, full_result)
     if "rate limit" in full_result.detail.lower():
         return full_result
 
@@ -201,7 +243,7 @@ async def _fetch_uncached(settings: Settings, tickers: list[str]) -> MarketDataR
         if loaded
         else f"Massive snapshot adapter returned no usable data. {errors} requests failed."
     )
-    return MarketDataResult(
+    result = MarketDataResult(
         provider="Massive",
         status=status,
         rows=rows,
@@ -209,6 +251,118 @@ async def _fetch_uncached(settings: Settings, tickers: list[str]) -> MarketDataR
         loaded_count=loaded,
         detail=detail,
     )
+    if result.status == "live":
+        return await _with_fundamentals(settings, base_url, tickers, result)
+    return result
+
+
+async def _with_fundamentals(
+    settings: Settings,
+    base_url: str,
+    tickers: list[str],
+    market_result: MarketDataResult,
+) -> MarketDataResult:
+    fundamentals = await _fetch_fundamentals_cached(settings, base_url, tickers)
+    rows: dict[str, dict[str, Any]] = {}
+    fundamentals_loaded = 0
+    for ticker, market in market_result.rows.items():
+        merged = dict(market)
+        fundamental = fundamentals.get(ticker, {})
+        if fundamental:
+            fundamentals_loaded += 1
+            merged.update(fundamental)
+            if merged.get("market_cap") is None:
+                shares = merged.get("weighted_shares_outstanding")
+                price = merged.get("price")
+                if shares and price:
+                    merged["market_cap"] = shares * price
+            eps = merged.get("ttm_diluted_eps") or merged.get("ttm_basic_eps")
+            if eps and merged.get("price"):
+                merged["pe_ratio"] = merged["price"] / eps
+        rows[ticker] = merged
+
+    return MarketDataResult(
+        provider=market_result.provider,
+        status=market_result.status,
+        rows=rows,
+        eligible_count=market_result.eligible_count,
+        loaded_count=market_result.loaded_count,
+        fundamentals_loaded_count=fundamentals_loaded,
+        detail=(
+            f"{market_result.detail} Fundamentals populated for "
+            f"{fundamentals_loaded}/{market_result.loaded_count} priced tickers."
+        ),
+    )
+
+
+async def _fetch_fundamentals_cached(
+    settings: Settings, base_url: str, tickers: list[str]
+) -> dict[str, dict[str, Any]]:
+    cache_key = ",".join(tickers)
+    now = time.monotonic()
+    cached = _fundamentals_cache.get("rows")
+    if (
+        _fundamentals_cache.get("key") == cache_key
+        and isinstance(cached, dict)
+        and float(_fundamentals_cache.get("expires_at", 0)) > now
+    ):
+        return cached
+
+    rows = await _fetch_fundamentals_uncached(settings, base_url, tickers)
+    _fundamentals_cache.update(
+        {
+            "key": cache_key,
+            "expires_at": now + max(settings.massive_fundamentals_cache_ttl_seconds, 60),
+            "rows": rows,
+        }
+    )
+    return rows
+
+
+async def _fetch_fundamentals_uncached(
+    settings: Settings, base_url: str, tickers: list[str]
+) -> dict[str, dict[str, Any]]:
+    semaphore = asyncio.Semaphore(max(settings.massive_request_concurrency, 1))
+    rows: dict[str, dict[str, Any]] = {}
+
+    async with httpx.AsyncClient(base_url=base_url, timeout=15) as client:
+
+        async def fetch_one(ticker: str) -> None:
+            async with semaphore:
+                overview: dict[str, Any] = {}
+                financials: dict[str, Any] = {}
+                try:
+                    response = await client.get(
+                        f"/v3/reference/tickers/{ticker}",
+                        params={"apiKey": settings.massive_api_key},
+                    )
+                    if response.status_code == 200:
+                        overview = normalize_ticker_overview(response.json())
+                except (httpx.HTTPError, ValueError):
+                    pass
+
+                try:
+                    response = await client.get(
+                        "/vX/reference/financials",
+                        params={
+                            "ticker": ticker,
+                            "timeframe": "ttm",
+                            "limit": 1,
+                            "apiKey": settings.massive_api_key,
+                        },
+                    )
+                    if response.status_code == 200:
+                        financials = normalize_financials(response.json())
+                except (httpx.HTTPError, ValueError):
+                    pass
+
+                merged = {**overview, **financials}
+                if merged:
+                    rows[ticker] = merged
+
+        await asyncio.gather(*(fetch_one(ticker) for ticker in tickers))
+
+    return rows
 
 
 async def _fetch_full_snapshot(
@@ -286,5 +440,6 @@ async def _fetch_full_snapshot(
         rows=rows,
         eligible_count=len(tickers),
         loaded_count=loaded,
+        fundamentals_loaded_count=0,
         detail=detail,
     )

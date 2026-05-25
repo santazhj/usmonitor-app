@@ -714,10 +714,9 @@ def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
         "change_percent": market.get("change_percent"),
         "volume": market.get("volume"),
         "dollar_volume": market.get("dollar_volume"),
-        "market_cap": None,
-        "pe_ratio": None,
+        "market_cap": market.get("market_cap"),
+        "pe_ratio": market.get("pe_ratio"),
         "revenue_growth": None,
-        "gross_margin": None,
         "market_updated_at": market.get("updated_at"),
         "market_provider": market.get("provider"),
     }
@@ -788,6 +787,9 @@ def get_dashboard_snapshot(market_data: MarketDataResult | None = None) -> dict:
                 "provider": "Massive",
                 "loaded_tickers": market_data.loaded_count if market_data else 0,
                 "eligible_tickers": market_data.eligible_count if market_data else 0,
+                "fundamentals_loaded": market_data.fundamentals_loaded_count
+                if market_data
+                else 0,
             },
             {
                 "name": "Fundamentals",
