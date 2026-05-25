@@ -20,9 +20,20 @@ const sourceStatus = document.querySelector("#sourceStatus");
 const dataStatus = document.querySelector("#dataStatus");
 const lastUpdated = document.querySelector("#lastUpdated");
 const refreshLabel = document.querySelector("#refreshLabel");
+const dashboardSearch = document.querySelector("#dashboardSearch");
+const tableStatus = document.querySelector("#tableStatus");
+const tickerDrawer = document.querySelector("#tickerDrawer");
+const drawerClose = document.querySelector("#drawerClose");
+const drawerBody = document.querySelector("#drawerBody");
 
 const LANGUAGE_KEY = "usmonitor.language";
+const CATEGORY_KEY = "usmonitor.dashboard.category";
+const SEARCH_KEY = "usmonitor.dashboard.search";
+const SORT_FIELD_KEY = "usmonitor.dashboard.sortField";
+const SORT_DIRECTION_KEY = "usmonitor.dashboard.sortDirection";
 const DEFAULT_LANGUAGE = "zh";
+const DEFAULT_SORT_FIELD = "dollar_volume";
+const DEFAULT_SORT_DIRECTION = "desc";
 
 const COPY = {
   zh: {
@@ -32,17 +43,22 @@ const COPY = {
     "nav.account": "账户",
     "nav.logout": "退出",
     "hero.eyebrow": "AI 基础设施",
-    "hero.title": "美股 AI 产业链看板",
+    "hero.title": "美股 AI 产业链终端",
     "hero.lede":
-      "按上游算力、半导体、电力、云和软件层拆分 watchlist。行情源未接入前，价格列保持锁定状态。",
+      "按算力、半导体、光互连、电力和软件分层跟踪核心标的，聚焦价格、流动性和产业链瓶颈。",
     "dashboard.refreshTarget": "{seconds}s 刷新目标",
     "dashboard.updated": "更新于 {date}",
     "dashboard.unavailable": "看板暂不可用",
+    "dashboard.rowsShown": "显示 {shown}/{total} 个标的，排序：{sort}",
+    "dashboard.noRows": "没有匹配的标的。",
     "metrics.tracked": "已跟踪",
-    "metrics.categories": "分类",
+    "metrics.market": "行情状态",
     "metrics.priced": "有行情",
+    "metrics.fundamentals": "基本面",
     "metrics.core": "核心瓶颈",
     "metrics.attention": "高关注",
+    "search.label": "搜索",
+    "search.placeholder": "Ticker、公司、AI 角色",
     "tabs.all": "全部",
     "table.ticker": "代码",
     "table.price": "价格",
@@ -54,6 +70,17 @@ const COPY = {
     "table.aiRole": "AI 角色",
     "table.latestSignal": "最新观察",
     "table.pending": "待接入",
+    "sort.ticker": "代码",
+    "sort.price": "价格",
+    "sort.change_percent": "% 涨跌",
+    "sort.market_cap": "市值",
+    "sort.dollar_volume": "交易额",
+    "sort.pe_ratio": "PE",
+    "drawer.market": "行情",
+    "drawer.aiRole": "AI 角色",
+    "drawer.latestSignal": "最新观察",
+    "drawer.positioning": "产业链定位",
+    "drawer.updated": "行情更新",
     "rail.sourceEyebrow": "数据源状态",
     "rail.sourceTitle": "数据状态",
     "rail.alertsEyebrow": "提醒",
@@ -110,17 +137,22 @@ const COPY = {
     "nav.account": "Account",
     "nav.logout": "Sign out",
     "hero.eyebrow": "AI Infrastructure",
-    "hero.title": "US AI Supply Chain Dashboard",
+    "hero.title": "US AI Supply Chain Terminal",
     "hero.lede":
-      "A curated watchlist grouped by compute, semiconductors, power, cloud, and software. Price fields stay locked until the market-data provider is connected.",
+      "A compact AI supply-chain terminal grouped by compute, semiconductors, optical links, power, and software.",
     "dashboard.refreshTarget": "{seconds}s refresh target",
     "dashboard.updated": "Updated {date}",
     "dashboard.unavailable": "Dashboard unavailable",
+    "dashboard.rowsShown": "Showing {shown}/{total} tickers, sorted by {sort}",
+    "dashboard.noRows": "No matching tickers.",
     "metrics.tracked": "Tracked",
-    "metrics.categories": "Categories",
+    "metrics.market": "Market",
     "metrics.priced": "Priced",
+    "metrics.fundamentals": "Fundamentals",
     "metrics.core": "Core Chokepoints",
     "metrics.attention": "High Attention",
+    "search.label": "Search",
+    "search.placeholder": "Ticker, company, AI role",
     "tabs.all": "All",
     "table.ticker": "Ticker",
     "table.price": "Price",
@@ -132,6 +164,17 @@ const COPY = {
     "table.aiRole": "AI Role",
     "table.latestSignal": "Latest Signal",
     "table.pending": "Pending",
+    "sort.ticker": "Ticker",
+    "sort.price": "Price",
+    "sort.change_percent": "% Chg",
+    "sort.market_cap": "Market Cap",
+    "sort.dollar_volume": "Dollar Vol",
+    "sort.pe_ratio": "PE",
+    "drawer.market": "Market",
+    "drawer.aiRole": "AI Role",
+    "drawer.latestSignal": "Latest Signal",
+    "drawer.positioning": "Supply-chain position",
+    "drawer.updated": "Market updated",
     "rail.sourceEyebrow": "Source Status",
     "rail.sourceTitle": "Data Status",
     "rail.alertsEyebrow": "Alerts",
@@ -309,7 +352,11 @@ const ROW_ZH = {
 
 let appConfig = {};
 let dashboardSnapshot = null;
-let selectedCategory = "all";
+let selectedCategory = localStorage.getItem(CATEGORY_KEY) || "all";
+let searchQuery = localStorage.getItem(SEARCH_KEY) || "";
+let sortField = localStorage.getItem(SORT_FIELD_KEY) || DEFAULT_SORT_FIELD;
+let sortDirection = localStorage.getItem(SORT_DIRECTION_KEY) || DEFAULT_SORT_DIRECTION;
+let activeDrawerTicker = null;
 let currentUser = null;
 let currentLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY));
 
@@ -385,6 +432,9 @@ function applyStaticCopy() {
   );
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
   });
 }
 
@@ -480,9 +530,89 @@ async function loadDashboard() {
   renderDashboard();
 }
 
+function marketSource(snapshot) {
+  return snapshot.source_status.find((source) => source.name === "Market data") || {};
+}
+
+function fundamentalsLabel(snapshot) {
+  const source = marketSource(snapshot);
+  if (source.status === "live" && source.loaded_tickers) {
+    return `${source.fundamentals_loaded || 0}/${source.loaded_tickers}`;
+  }
+  return localizeValue("pending");
+}
+
+function sortLabel(field = sortField) {
+  return t(`sort.${field}`);
+}
+
+function sortDirectionGlyph() {
+  return sortDirection === "asc" ? "↑" : "↓";
+}
+
+function getSortValue(row, field) {
+  if (field === "ticker") return row.ticker || "";
+  const value = row[field];
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function compareRows(a, b) {
+  const aValue = getSortValue(a, sortField);
+  const bValue = getSortValue(b, sortField);
+  if (sortField === "ticker") {
+    return sortDirection === "asc"
+      ? String(aValue).localeCompare(String(bValue))
+      : String(bValue).localeCompare(String(aValue));
+  }
+  if (aValue === null && bValue === null) return a.ticker.localeCompare(b.ticker);
+  if (aValue === null) return 1;
+  if (bValue === null) return -1;
+  return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+}
+
+function rowMatchesSearch(row) {
+  const query = searchQuery.trim().toLowerCase();
+  if (!query) return true;
+  const haystack = [
+    row.ticker,
+    row.company,
+    row.category_label,
+    row.ai_layer,
+    row.role,
+    row.latest_signal,
+    localizeRow(row, "ai_layer"),
+    localizeRow(row, "role"),
+    localizeRow(row, "latest_signal")
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+function visibleRows(snapshot) {
+  const rows =
+    selectedCategory === "all"
+      ? snapshot.rows
+      : snapshot.rows.filter((row) => row.category === selectedCategory);
+  return rows.filter(rowMatchesSearch).sort(compareRows);
+}
+
+function persistDashboardState() {
+  localStorage.setItem(CATEGORY_KEY, selectedCategory);
+  localStorage.setItem(SEARCH_KEY, searchQuery);
+  localStorage.setItem(SORT_FIELD_KEY, sortField);
+  localStorage.setItem(SORT_DIRECTION_KEY, sortDirection);
+}
+
 function renderDashboard() {
   const snapshot = dashboardSnapshot;
   if (!snapshot) return;
+
+  if (dashboardSearch && dashboardSearch.value !== searchQuery) {
+    dashboardSearch.value = searchQuery;
+  }
 
   refreshLabel.textContent = t("dashboard.refreshTarget", {
     seconds: snapshot.refresh_interval_seconds
@@ -493,8 +623,9 @@ function renderDashboard() {
   });
 
   dashboardMetrics.innerHTML = [
-    [t("metrics.tracked"), snapshot.metrics.tracked_tickers],
+    [t("metrics.market"), localizeValue(snapshot.data_status_label)],
     [t("metrics.priced"), snapshot.metrics.priced_tickers],
+    [t("metrics.fundamentals"), fundamentalsLabel(snapshot)],
     [t("metrics.core"), snapshot.metrics.core_chokepoints],
     [t("metrics.attention"), snapshot.metrics.high_attention]
   ]
@@ -506,6 +637,16 @@ function renderDashboard() {
         </article>`
     )
     .join("");
+
+  document.querySelectorAll(".table-sort").forEach((button) => {
+    const active = button.dataset.sort === sortField;
+    button.classList.toggle("active", active);
+    button.dataset.direction = active ? sortDirectionGlyph() : "";
+    button.setAttribute(
+      "aria-label",
+      `${button.textContent.trim()} ${active ? sortDirectionGlyph() : ""}`.trim()
+    );
+  });
 
   const tabs = [
     { slug: "all", label: t("tabs.all"), count: snapshot.rows.length },
@@ -520,7 +661,7 @@ function renderDashboard() {
       (tab) => `
         <button class="${tab.slug === selectedCategory ? "active" : ""}"
           data-category="${escapeHtml(tab.slug)}"
-          title="${escapeHtml(tab.description || tab.label)}"
+      title="${escapeHtml(tab.description || tab.label)}"
           type="button">
           <span>${escapeHtml(tab.label)}</span>
           <small>${escapeHtml(tab.count)}</small>
@@ -528,35 +669,61 @@ function renderDashboard() {
     )
     .join("");
 
-  const rows =
-    selectedCategory === "all"
-      ? snapshot.rows
-      : snapshot.rows.filter((row) => row.category === selectedCategory);
+  const rows = visibleRows(snapshot);
+  tableStatus.textContent = t("dashboard.rowsShown", {
+    shown: rows.length,
+    total: snapshot.rows.length,
+    sort: `${sortLabel()} ${sortDirectionGlyph()}`
+  });
 
-  dashboardRows.innerHTML = rows
-    .map(
-      (row) => `
-        <article class="market-row">
-          <div class="ticker-cell">
-            <strong>${escapeHtml(row.ticker)}</strong>
-            <span>${escapeHtml(row.company)}</span>
-            <small>${escapeHtml(localizeValue(row.tier))} | ${escapeHtml(
-        localizeValue(row.focus)
-      )}</small>
-          </div>
-          <span class="price-cell">${escapeHtml(formatPrice(row.price))}</span>
-          <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
-            ${escapeHtml(formatPercent(row.change_percent))}
-          </span>
-          <span>${escapeHtml(formatMarketCap(row.market_cap))}</span>
-          <span>${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
-          <span>${escapeHtml(formatRatio(row.pe_ratio))}</span>
-          <span class="pending-cell">--</span>
-          <span>${escapeHtml(localizeRow(row, "role"))}</span>
-          <span>${escapeHtml(localizeRow(row, "latest_signal"))}</span>
-        </article>`
-    )
-    .join("");
+  if (!rows.length) {
+    dashboardRows.innerHTML = `<p class="empty-table">${escapeHtml(
+      t("dashboard.noRows")
+    )}</p>`;
+  } else {
+    dashboardRows.innerHTML = rows
+      .map(
+        (row) => `
+          <article class="market-row" role="button" tabindex="0" data-ticker="${escapeHtml(row.ticker)}">
+            <div class="ticker-cell">
+              <strong>${escapeHtml(row.ticker)}</strong>
+              <span>${escapeHtml(row.company)}</span>
+              <small>${escapeHtml(localizeValue(row.tier))} | ${escapeHtml(
+          localizeValue(row.focus)
+        )}</small>
+            </div>
+            <span class="price-cell">${escapeHtml(formatPrice(row.price))}</span>
+            <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
+              ${escapeHtml(formatPercent(row.change_percent))}
+            </span>
+            <span class="number-cell">${escapeHtml(formatMarketCap(row.market_cap))}</span>
+            <span class="number-cell">${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
+            <span class="number-cell">${escapeHtml(formatRatio(row.pe_ratio))}</span>
+            <span class="pending-cell">--</span>
+            <span>${escapeHtml(localizeRow(row, "role"))}</span>
+            <span>${escapeHtml(localizeRow(row, "latest_signal"))}</span>
+          </article>`
+      )
+      .join("");
+    dashboardRows.querySelectorAll(".market-row[data-ticker]").forEach((rowButton) => {
+      const openRow = () => {
+        renderTickerDrawer(rowButton.dataset.ticker);
+      };
+      rowButton.addEventListener("click", openRow);
+      rowButton.addEventListener("pointerup", openRow);
+      rowButton.addEventListener("mouseup", openRow);
+      rowButton.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openRow();
+        }
+      });
+    });
+  }
+
+  if (activeDrawerTicker) {
+    renderTickerDrawer(activeDrawerTicker);
+  }
 
   sourceStatus.innerHTML = snapshot.source_status
     .map(
@@ -570,6 +737,59 @@ function renderDashboard() {
         </article>`
     )
     .join("");
+}
+
+function drawerMetric(label, value, className = "") {
+  return `
+    <article>
+      <span>${escapeHtml(label)}</span>
+      <strong class="${escapeHtml(className)}">${escapeHtml(value)}</strong>
+    </article>`;
+}
+
+function renderTickerDrawer(ticker) {
+  const row = dashboardSnapshot?.rows.find((item) => item.ticker === ticker);
+  if (!row) return;
+  activeDrawerTicker = ticker;
+  drawerBody.innerHTML = `
+    <p class="drawer-kicker">${escapeHtml(localizeValue(row.category_label))}</p>
+    <div class="drawer-title">
+      <h2 id="drawerTitle">${escapeHtml(row.ticker)}</h2>
+      <span>${escapeHtml(row.company)}</span>
+    </div>
+    <div class="drawer-metrics">
+      ${drawerMetric(t("table.price"), formatPrice(row.price))}
+      ${drawerMetric(
+        t("table.change"),
+        formatPercent(row.change_percent),
+        valueClass(row.change_percent)
+      )}
+      ${drawerMetric(t("table.marketCap"), formatMarketCap(row.market_cap))}
+      ${drawerMetric(t("table.dollarVolume"), formatCompactNumber(row.dollar_volume))}
+      ${drawerMetric(t("table.pe"), formatRatio(row.pe_ratio))}
+      ${drawerMetric(t("drawer.updated"), formatDate(row.market_updated_at))}
+    </div>
+    <section class="drawer-section">
+      <span>${escapeHtml(t("drawer.positioning"))}</span>
+      <p>${escapeHtml(localizeRow(row, "ai_layer"))}</p>
+      <p>${escapeHtml(localizeValue(row.tier))} | ${escapeHtml(localizeValue(row.focus))}</p>
+    </section>
+    <section class="drawer-section">
+      <span>${escapeHtml(t("drawer.aiRole"))}</span>
+      <p>${escapeHtml(localizeRow(row, "role"))}</p>
+    </section>
+    <section class="drawer-section">
+      <span>${escapeHtml(t("drawer.latestSignal"))}</span>
+      <p>${escapeHtml(localizeRow(row, "latest_signal"))}</p>
+    </section>`;
+  tickerDrawer.classList.remove("hidden");
+  tickerDrawer.setAttribute("aria-hidden", "false");
+}
+
+function closeTickerDrawer() {
+  activeDrawerTicker = null;
+  tickerDrawer.classList.add("hidden");
+  tickerDrawer.setAttribute("aria-hidden", "true");
 }
 
 async function loadApp(existingMe) {
@@ -715,7 +935,47 @@ categoryTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-category]");
   if (!button) return;
   selectedCategory = button.dataset.category;
+  persistDashboardState();
   renderDashboard();
+});
+
+dashboardSearch.addEventListener("input", (event) => {
+  searchQuery = event.target.value;
+  persistDashboardState();
+  renderDashboard();
+});
+
+document.querySelector(".market-table-header").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-sort]");
+  if (!button) return;
+  const nextField = button.dataset.sort;
+  if (sortField === nextField) {
+    sortDirection = sortDirection === "asc" ? "desc" : "asc";
+  } else {
+    sortField = nextField;
+    sortDirection = nextField === "ticker" ? "asc" : "desc";
+  }
+  persistDashboardState();
+  renderDashboard();
+});
+
+dashboardRows.addEventListener("click", (event) => {
+  const row = event.target.closest(".market-row[data-ticker]");
+  if (!row) return;
+  renderTickerDrawer(row.dataset.ticker);
+});
+
+drawerClose.addEventListener("click", closeTickerDrawer);
+tickerDrawer.addEventListener("click", (event) => {
+  if (event.target.matches("[data-drawer-close]")) {
+    closeTickerDrawer();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !tickerDrawer.classList.contains("hidden")) {
+    closeTickerDrawer();
+  }
 });
 
 languageToggle.addEventListener("click", () => {

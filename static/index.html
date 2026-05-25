@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f4f2ed" />
+    <meta name="theme-color" content="#0b1017" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
     <link rel="stylesheet" href="/static/styles.css" />
@@ -17,9 +17,9 @@
           <span>US Monitor</span>
         </a>
         <nav class="nav-actions" aria-label="Primary">
-          <a class="quiet-link" href="#dashboard" data-i18n="nav.dashboard">Dashboard</a>
-          <a class="quiet-link" href="#alerts" data-i18n="nav.alerts">Alerts</a>
-          <a class="quiet-link" href="#account" data-i18n="nav.account">Account</a>
+          <a class="quiet-link" href="#dashboard" data-i18n="nav.dashboard">看板</a>
+          <a class="quiet-link" href="#alerts" data-i18n="nav.alerts">情报</a>
+          <a class="quiet-link" href="#account" data-i18n="nav.account">账户</a>
           <a id="adminLink" class="quiet-link hidden" href="/admin">Admin</a>
           <button id="languageToggle" class="text-button lang-toggle" type="button">
             EN
@@ -34,10 +34,10 @@
         <section class="dashboard-main">
           <div class="dashboard-heading">
             <div>
-              <p class="eyebrow" data-i18n="hero.eyebrow">AI Infrastructure</p>
-              <h1 data-i18n="hero.title">美股 AI 产业链看板</h1>
+              <p class="eyebrow" data-i18n="hero.eyebrow">AI 基础设施</p>
+              <h1 data-i18n="hero.title">美股 AI 产业链终端</h1>
               <p class="lede" data-i18n="hero.lede">
-                按上游算力、半导体、电力、云和软件层拆分 watchlist。行情源未接入前，价格列保持锁定状态。
+                按算力、半导体、光互连、电力和软件分层跟踪核心标的，聚焦价格、流动性和产业链瓶颈。
               </p>
             </div>
             <div class="refresh-card">
@@ -48,41 +48,76 @@
           </div>
 
           <div class="metric-strip" id="dashboardMetrics"></div>
+
+          <div class="dashboard-command">
+            <label class="search-box" for="dashboardSearch">
+              <span data-i18n="search.label">搜索</span>
+              <input
+                id="dashboardSearch"
+                type="search"
+                autocomplete="off"
+                data-i18n-placeholder="search.placeholder"
+                placeholder="Ticker, company, AI role"
+              />
+            </label>
+            <p id="tableStatus" class="table-status">--</p>
+          </div>
+
           <div class="category-tabs" id="categoryTabs"></div>
 
           <section class="market-table-wrap" aria-label="AI stock watchlist">
             <div class="market-table-header">
-              <span data-i18n="table.ticker">Ticker</span>
-              <span data-i18n="table.price">Price</span>
-              <span data-i18n="table.change">% Chg</span>
-              <span data-i18n="table.marketCap">Mkt Cap</span>
-              <span data-i18n="table.dollarVolume">Dollar Vol</span>
-              <span data-i18n="table.pe">PE</span>
-              <span data-i18n="table.revGrowth">Rev Growth</span>
-              <span data-i18n="table.aiRole">AI Role</span>
-              <span data-i18n="table.latestSignal">Latest Signal</span>
+              <button class="table-sort" data-sort="ticker" type="button" data-i18n="table.ticker">
+                代码
+              </button>
+              <button class="table-sort" data-sort="price" type="button" data-i18n="table.price">
+                价格
+              </button>
+              <button class="table-sort" data-sort="change_percent" type="button" data-i18n="table.change">
+                % 涨跌
+              </button>
+              <button class="table-sort" data-sort="market_cap" type="button" data-i18n="table.marketCap">
+                市值
+              </button>
+              <button class="table-sort" data-sort="dollar_volume" type="button" data-i18n="table.dollarVolume">
+                交易额
+              </button>
+              <button class="table-sort" data-sort="pe_ratio" type="button" data-i18n="table.pe">
+                PE
+              </button>
+              <span data-i18n="table.revGrowth">收入增速</span>
+              <span data-i18n="table.aiRole">AI 角色</span>
+              <span data-i18n="table.latestSignal">最新观察</span>
             </div>
             <div id="dashboardRows" class="market-table-body"></div>
           </section>
         </section>
 
         <aside class="dashboard-rail">
-          <section class="rail-panel">
-            <div class="section-title">
-              <p class="eyebrow" data-i18n="rail.sourceEyebrow">Source Status</p>
-              <h2 data-i18n="rail.sourceTitle">数据状态</h2>
-            </div>
-            <div id="sourceStatus" class="source-list"></div>
-          </section>
-
           <section id="alerts" class="rail-panel">
             <div class="section-title">
-              <p class="eyebrow" data-i18n="rail.alertsEyebrow">Alerts</p>
+              <p class="eyebrow" data-i18n="rail.alertsEyebrow">提醒</p>
               <h2 data-i18n="rail.alertsTitle">最新情报</h2>
             </div>
             <div id="feedBox" class="feed-list compact-feed">
               <p class="empty" data-i18n="alerts.signedOut">登录后查看完整 alert feed。</p>
             </div>
+          </section>
+
+          <section class="rail-panel">
+            <div class="section-title">
+              <p class="eyebrow" data-i18n="rail.sourceEyebrow">数据源状态</p>
+              <h2 data-i18n="rail.sourceTitle">数据状态</h2>
+            </div>
+            <div id="sourceStatus" class="source-list"></div>
+          </section>
+
+          <section class="rail-panel disclaimer-panel">
+            <p class="eyebrow" data-i18n="terms.eyebrow">定位</p>
+            <h2 data-i18n="terms.title">情报摘要，不是交易建议</h2>
+            <p data-i18n="terms.body">
+              第一版仅邀请制开放。邮件只用于登录和账户通知，alert 走 iPhone PWA Web Push。
+            </p>
           </section>
         </aside>
       </section>
@@ -90,7 +125,7 @@
       <section id="account" class="account-grid">
         <section id="authView" class="panel auth-panel hidden">
           <div class="section-title">
-            <p class="eyebrow" data-i18n="auth.eyebrow">Invite Only</p>
+            <p class="eyebrow" data-i18n="auth.eyebrow">邀请制</p>
             <h2 data-i18n="auth.title">邮箱魔法链接登录</h2>
           </div>
           <form id="loginForm" class="stack">
@@ -110,7 +145,7 @@
         <section id="memberView" class="member-grid hidden">
           <section class="panel account-panel">
             <div>
-              <p class="eyebrow" data-i18n="account.eyebrow">Account</p>
+              <p class="eyebrow" data-i18n="account.eyebrow">账户</p>
               <h2 id="accountEmail">-</h2>
             </div>
             <div id="subscriptionState" class="state-box"></div>
@@ -118,7 +153,7 @@
 
           <section class="panel controls-panel">
             <div>
-              <p class="eyebrow" data-i18n="push.eyebrow">Push</p>
+              <p class="eyebrow" data-i18n="push.eyebrow">推送</p>
               <h2 data-i18n="push.title">iPhone PWA 推送</h2>
             </div>
             <div class="button-row">
@@ -134,7 +169,7 @@
 
           <section class="panel payment-panel">
             <div>
-              <p class="eyebrow" data-i18n="payment.eyebrow">Payment</p>
+              <p class="eyebrow" data-i18n="payment.eyebrow">付款</p>
               <h2 data-i18n="payment.title">99 USDT / 月</h2>
             </div>
             <div id="paymentBox" class="payment-box"></div>
@@ -142,22 +177,23 @@
 
           <section class="panel lists-panel">
             <div>
-              <p class="eyebrow" data-i18n="lists.eyebrow">Lists</p>
+              <p class="eyebrow" data-i18n="lists.eyebrow">列表</p>
               <h2 data-i18n="lists.title">订阅列表</h2>
             </div>
             <div id="listBox" class="list-box"></div>
           </section>
         </section>
-
-        <aside class="panel terms-panel">
-          <p class="eyebrow" data-i18n="terms.eyebrow">Positioning</p>
-          <h2 data-i18n="terms.title">情报摘要，不是交易建议</h2>
-          <p data-i18n="terms.body">
-            第一版仅邀请制开放。邮件只用于登录和账户通知，alert 走 iPhone PWA Web Push。
-          </p>
-        </aside>
       </section>
     </main>
+
+    <aside id="tickerDrawer" class="ticker-drawer hidden" aria-hidden="true">
+      <div class="drawer-backdrop" data-drawer-close></div>
+      <section class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+        <button id="drawerClose" class="icon-button" type="button" aria-label="Close">×</button>
+        <div id="drawerBody"></div>
+      </section>
+    </aside>
+
     <script src="/static/app.js" type="module"></script>
   </body>
 </html>
