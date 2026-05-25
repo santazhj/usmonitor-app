@@ -6,10 +6,8 @@ const adminSession = document.querySelector("#adminSession");
 const adminMessage = document.querySelector("#adminMessage");
 const countsBox = document.querySelector("#countsBox");
 const paymentsBox = document.querySelector("#paymentsBox");
-const invitesBox = document.querySelector("#invitesBox");
 const sourcesBox = document.querySelector("#sourcesBox");
 const jobsBox = document.querySelector("#jobsBox");
-const inviteForm = document.querySelector("#inviteForm");
 const pollBtn = document.querySelector("#pollBtn");
 
 async function api(path, options = {}) {
@@ -69,18 +67,6 @@ async function loadOverview() {
         .join("")
     : `<p class="empty">暂无待确认付款。</p>`;
 
-  invitesBox.innerHTML = data.invites
-    .map(
-      (item) => `
-        <article class="table-row">
-          <code>${item.code}</code>
-          <span>${item.label || "-"}</span>
-          <span>${item.uses_count}/${item.max_uses}</span>
-          <mark>${item.usable ? "Open" : "Closed"}</mark>
-        </article>`
-    )
-    .join("");
-
   sourcesBox.innerHTML = data.sources
     .map(
       (item) => `
@@ -117,21 +103,6 @@ async function loadOverview() {
     });
   });
 }
-
-inviteForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = new FormData(inviteForm);
-  const result = await api("/api/admin/invites", {
-    method: "POST",
-    body: JSON.stringify({
-      label: form.get("label"),
-      max_uses: Number(form.get("max_uses") || 1)
-    })
-  });
-  adminMessage.innerHTML = `邀请码：<code>${result.code}</code>`;
-  inviteForm.reset();
-  await loadOverview();
-});
 
 pollBtn.addEventListener("click", async () => {
   adminMessage.textContent = "轮询中...";

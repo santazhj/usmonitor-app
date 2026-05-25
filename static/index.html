@@ -115,7 +115,7 @@
             <p class="eyebrow" data-i18n="terms.eyebrow">定位</p>
             <h2 data-i18n="terms.title">情报摘要，不是交易建议</h2>
             <p data-i18n="terms.body">
-              第一版仅邀请制开放。邮件只用于登录和账户通知，alert 走 iPhone PWA Web Push。
+              邮箱可直接注册免费版。高级 alert 和推送权限需付款，或由后台手动开通会员。
             </p>
           </section>
         </aside>
@@ -124,17 +124,13 @@
       <section id="account" class="account-grid">
         <section id="authView" class="panel auth-panel hidden">
           <div class="section-title">
-            <p class="eyebrow" data-i18n="auth.eyebrow">邀请制</p>
-            <h2 data-i18n="auth.title">邮箱魔法链接登录</h2>
+            <p class="eyebrow" data-i18n="auth.eyebrow">邮箱注册</p>
+            <h2 data-i18n="auth.title">邮箱注册 / 登录</h2>
           </div>
           <form id="loginForm" class="stack">
             <label>
               <span data-i18n="auth.email">邮箱</span>
               <input name="email" type="email" autocomplete="email" required />
-            </label>
-            <label>
-              <span data-i18n="auth.inviteCode">邀请码</span>
-              <input name="invite_code" type="text" autocomplete="one-time-code" />
             </label>
             <button class="primary" type="submit" data-i18n="auth.submit">发送登录链接</button>
           </form>

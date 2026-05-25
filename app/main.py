@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -18,7 +17,6 @@ from app.jobs.poll_sources import poll_sources
 from app.models import (
     AlertSummary,
     Delivery,
-    InviteCode,
     JobRun,
     ManualPayment,
     MonitorList,
@@ -28,7 +26,7 @@ from app.models import (
     User,
     utcnow,
 )
-from app.security import random_code, sign_payload, verify_payload
+from app.security import sign_payload, verify_payload
 from app.services.emailer import send_magic_link
 from app.services.dashboard import dashboard_tickers, get_dashboard_snapshot
 from app.services.market_data import fetch_massive_market_data
@@ -57,16 +55,10 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 class AuthRequest(BaseModel):
     email: str
-    invite_code: str | None = None
 
 
 class PushSubscribeRequest(BaseModel):
     subscription: dict
-
-
-class CreateInviteRequest(BaseModel):
-    label: str = ""
-    max_uses: int = 1
 
 
 class ConfirmPaymentRequest(BaseModel):
@@ -83,15 +75,6 @@ def clean_email(email: str) -> str:
     if "@" not in email or len(email) > 320:
         raise HTTPException(status_code=400, detail="Invalid email")
     return email
-
-
-def validate_invite(db: Session, code: str | None) -> InviteCode:
-    if not code:
-        raise HTTPException(status_code=400, detail="Invite code is required")
-    invite = db.query(InviteCode).filter(InviteCode.code == code.strip().upper()).first()
-    if not invite or not invite.usable():
-        raise HTTPException(status_code=400, detail="Invite code is invalid")
-    return invite
 
 
 def current_user(
@@ -192,18 +175,11 @@ async def icon():
 @app.post("/api/auth/request")
 async def request_login(
     payload: AuthRequest,
-    db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
     email = clean_email(payload.email)
-    user = db.query(User).filter(User.email == email).first()
-    is_admin_email = email in settings.admin_emails
-
-    if not user and not is_admin_email:
-        validate_invite(db, payload.invite_code)
-
     token = sign_payload(
-        {"typ": "magic", "email": email, "invite_code": payload.invite_code or ""},
+        {"typ": "magic", "email": email},
         settings.secret_key,
         settings.magic_link_ttl_seconds,
     )
@@ -225,9 +201,6 @@ async def verify_login(
     email = clean_email(payload["email"])
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        if email not in settings.admin_emails:
-            invite = validate_invite(db, payload.get("invite_code"))
-            invite.uses_count += 1
         user = User(email=email, is_admin=email in settings.admin_emails)
         db.add(user)
     elif email in settings.admin_emails and not user.is_admin:
@@ -444,7 +417,6 @@ async def admin_overview(
         .all()
     )
     users = db.query(User).order_by(User.created_at.desc()).limit(50).all()
-    invites = db.query(InviteCode).order_by(InviteCode.created_at.desc()).limit(50).all()
     sources = db.query(MonitoredSource).order_by(MonitoredSource.created_at.desc()).all()
     jobs = db.query(JobRun).order_by(JobRun.started_at.desc()).limit(20).all()
     return {
@@ -476,17 +448,6 @@ async def admin_overview(
             }
             for item in users
         ],
-        "invites": [
-            {
-                "code": item.code,
-                "label": item.label,
-                "uses_count": item.uses_count,
-                "max_uses": item.max_uses,
-                "created_at": item.created_at.isoformat(),
-                "usable": item.usable(),
-            }
-            for item in invites
-        ],
         "sources": [
             {
                 "id": item.id,
@@ -512,25 +473,6 @@ async def admin_overview(
             for item in jobs
         ],
     }
-
-
-@app.post("/api/admin/invites")
-async def create_invite(
-    payload: CreateInviteRequest,
-    admin: User = Depends(current_admin),
-    db: Session = Depends(get_db),
-):
-    code = random_code("INV-").upper()
-    invite = InviteCode(
-        code=code,
-        label=payload.label,
-        max_uses=max(1, min(payload.max_uses, 100)),
-        expires_at=utcnow() + timedelta(days=30),
-        created_by_user_id=admin.id,
-    )
-    db.add(invite)
-    db.commit()
-    return {"code": invite.code}
 
 
 @app.post("/api/admin/payments/{payment_id}/confirm")
