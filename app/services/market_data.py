@@ -327,11 +327,11 @@ async def fetch_dashboard_market_data(
     settings: Settings, tickers: list[str]
 ) -> MarketDataResult:
     massive = await fetch_massive_market_data(settings, tickers)
-    rows = dict(massive.rows)
+    rows = {ticker: dict(row) for ticker, row in massive.rows.items()}
     missing = [ticker for ticker in tickers if ticker not in rows]
     yahoo_rows = await fetch_yahoo_chart_market_data(settings, missing)
     for ticker, row in yahoo_rows.items():
-        rows.setdefault(ticker, row)
+        rows.setdefault(ticker, dict(row))
 
     if rows:
         yahoo_loaded = len([ticker for ticker in yahoo_rows if ticker in rows])
@@ -366,22 +366,30 @@ async def fetch_dashboard_market_data(
             for row in rows.values()
             if row.get("market_cap") is not None or row.get("pe_ratio") is not None
         )
+        yahoo_fundamentals_available = sum(
+            1
+            for row in rows.values()
+            if row.get("fundamentals_provider") == "Yahoo Quote"
+            and (
+                row.get("market_cap") is not None or row.get("pe_ratio") is not None
+            )
+        )
         detail = massive.detail
         if yahoo_loaded:
             detail = (
                 f"{detail} Yahoo Chart fallback populated "
                 f"{yahoo_loaded}/{len(missing)} missing/global tickers."
             )
-        if yahoo_fundamentals_loaded:
+        if yahoo_fundamentals_loaded or yahoo_fundamentals_available:
             detail = (
                 f"{detail} Yahoo Quote fundamentals populated "
-                f"{yahoo_fundamentals_loaded}/{len(fundamentals_needed)} "
+                f"{yahoo_fundamentals_available}/{len(rows)} "
                 "market-cap/PE rows."
             )
         provider_parts = ["Massive"]
         if yahoo_loaded:
             provider_parts.append("Yahoo Chart")
-        if yahoo_fundamentals_loaded:
+        if yahoo_fundamentals_available:
             provider_parts.append("Yahoo Quote")
         return MarketDataResult(
             provider=" + ".join(provider_parts),
