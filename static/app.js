@@ -31,6 +31,7 @@ const CATEGORY_KEY = "usmonitor.dashboard.category";
 const SEARCH_KEY = "usmonitor.dashboard.search";
 const SORT_FIELD_KEY = "usmonitor.dashboard.sortField";
 const SORT_DIRECTION_KEY = "usmonitor.dashboard.sortDirection";
+const VISITOR_KEY = "usmonitor.visitorId";
 const DEFAULT_LANGUAGE = "zh";
 const DEFAULT_SORT_FIELD = "dollar_volume";
 const DEFAULT_SORT_DIRECTION = "desc";
@@ -115,6 +116,7 @@ const COPY = {
     "payment.eyebrow": "付款",
     "payment.title": "升级会员：99 USDT / 月",
     "payment.adminBypass": "管理员访问已开通，无需付款。",
+    "payment.memberActive": "会员服务已开通，到期前无需再次付款。",
     "payment.amount": "金额",
     "payment.month": "月",
     "payment.noteCode": "备注码",
@@ -207,6 +209,7 @@ const COPY = {
     "payment.eyebrow": "Payment",
     "payment.title": "Upgrade: 99 USDT / month",
     "payment.adminBypass": "Admin access is active. No payment required.",
+    "payment.memberActive": "Premium is active. No payment is required before expiry.",
     "payment.amount": "Amount",
     "payment.month": "month",
     "payment.noteCode": "Note code",
@@ -419,6 +422,7 @@ let sortDirection = localStorage.getItem(SORT_DIRECTION_KEY) || DEFAULT_SORT_DIR
 let activeDrawerTicker = null;
 let currentUser = null;
 let currentLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY));
+let lastEngagementAt = Date.now();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -432,6 +436,73 @@ async function api(path, options = {}) {
   }
   if (response.status === 204) return null;
   return response.json();
+}
+
+function getVisitorId() {
+  let visitorId = localStorage.getItem(VISITOR_KEY);
+  if (!visitorId) {
+    visitorId =
+      window.crypto?.randomUUID?.() ||
+      `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(VISITOR_KEY, visitorId);
+  }
+  return visitorId;
+}
+
+function analyticsPayload(eventType, durationSeconds = 0) {
+  return {
+    visitor_id: getVisitorId(),
+    event_type: eventType,
+    path: `${location.pathname}${location.hash || ""}`,
+    duration_seconds: Math.max(0, Math.round(durationSeconds)),
+    language: currentLanguage,
+    viewport: `${window.innerWidth}x${window.innerHeight}`
+  };
+}
+
+function sendAnalytics(eventType, durationSeconds = 0, useBeacon = false) {
+  const payload = analyticsPayload(eventType, durationSeconds);
+  if (useBeacon && navigator.sendBeacon) {
+    const blob = new Blob([JSON.stringify(payload)], {
+      type: "application/json"
+    });
+    navigator.sendBeacon("/api/analytics/event", blob);
+    return;
+  }
+  fetch("/api/analytics/event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    keepalive: useBeacon,
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
+function flushEngagement(useBeacon = false) {
+  const now = Date.now();
+  const seconds = (now - lastEngagementAt) / 1000;
+  lastEngagementAt = now;
+  if (seconds >= 2) {
+    sendAnalytics("heartbeat", seconds, useBeacon);
+  }
+}
+
+function startAnalytics() {
+  sendAnalytics("pageview");
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      flushEngagement();
+    }
+  }, 30_000);
+  window.addEventListener("hashchange", () => sendAnalytics("pageview"));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushEngagement(true);
+    } else {
+      lastEngagementAt = Date.now();
+    }
+  });
+  window.addEventListener("pagehide", () => flushEngagement(true));
 }
 
 function normalizeLanguage(value) {
@@ -905,6 +976,18 @@ async function loadPayment() {
       </dl>`;
     return;
   }
+  if (payment.member_active) {
+    paymentBox.innerHTML = `
+      <p class="status-line">${escapeHtml(t("payment.memberActive"))}</p>
+      <dl>
+        <div><dt>${escapeHtml(t("account.active"))}</dt><dd>${escapeHtml(
+      formatDate(payment.expires_at)
+    )}</dd></div>
+        <div><dt>TRC20</dt><dd>${moneyAddress(payment.trc20_address)}</dd></div>
+        <div><dt>ERC20</dt><dd>${moneyAddress(payment.erc20_address)}</dd></div>
+      </dl>`;
+    return;
+  }
   paymentBox.innerHTML = `
     <dl>
       <div><dt>${escapeHtml(t("payment.amount"))}</dt><dd>${escapeHtml(
@@ -1079,6 +1162,7 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 applyStaticCopy();
+startAnalytics();
 loadDashboard().catch(() => {
   dataStatus.textContent = t("dashboard.unavailable");
 });

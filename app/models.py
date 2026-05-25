@@ -184,6 +184,23 @@ class PushSubscription(Base):
     user: Mapped[User] = relationship(back_populates="push_subscriptions")
 
 
+class AnalyticsEvent(Base):
+    __tablename__ = "analytics_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    visitor_id: Mapped[str] = mapped_column(String(120), index=True)
+    event_type: Mapped[str] = mapped_column(String(32), index=True)
+    path: Mapped[str] = mapped_column(String(500), default="/", index=True)
+    duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    language: Mapped[str] = mapped_column(String(16), default="")
+    viewport: Mapped[str] = mapped_column(String(32), default="")
+    user_agent: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User | None] = relationship()
+
+
 class Delivery(Base):
     __tablename__ = "deliveries"
 

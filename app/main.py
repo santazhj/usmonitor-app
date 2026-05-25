@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -16,6 +17,7 @@ from app.db import get_db, init_db
 from app.jobs.poll_sources import poll_sources
 from app.models import (
     AlertSummary,
+    AnalyticsEvent,
     Delivery,
     JobRun,
     ManualPayment,
@@ -70,6 +72,20 @@ class RejectPaymentRequest(BaseModel):
     reason: str = ""
 
 
+class AnalyticsEventRequest(BaseModel):
+    visitor_id: str
+    event_type: str = "pageview"
+    path: str = "/"
+    duration_seconds: int = 0
+    language: str = ""
+    viewport: str = ""
+
+
+class MembershipRequest(BaseModel):
+    active: bool
+    months: int = 1
+
+
 def clean_email(email: str) -> str:
     email = email.strip().lower()
     if "@" not in email or len(email) > 320:
@@ -96,6 +112,18 @@ def current_admin(user: User = Depends(current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+def optional_current_user(
+    request: Request,
+    db: Session,
+    settings: Settings,
+) -> User | None:
+    token = request.cookies.get(SESSION_COOKIE)
+    payload = verify_payload(token or "", settings.secret_key)
+    if not payload or payload.get("typ") != "session":
+        return None
+    return db.query(User).filter(User.id == payload.get("uid")).first()
 
 
 def active_subscription(db: Session, user: User, monitor_list_id: str | None = None):
@@ -129,6 +157,53 @@ def accessible_monitor_list_ids(db: Session, user: User) -> list[str]:
         .all()
     )
     return [item.monitor_list_id for item in subscriptions]
+
+
+def grant_membership(db: Session, user: User, months: int = 1) -> Subscription:
+    monitor_list = db.query(MonitorList).filter(MonitorList.is_active.is_(True)).first()
+    if not monitor_list:
+        raise HTTPException(status_code=400, detail="No active monitor list exists")
+
+    now = utcnow()
+    current = (
+        db.query(Subscription)
+        .filter(
+            Subscription.user_id == user.id,
+            Subscription.monitor_list_id == monitor_list.id,
+            Subscription.status == "active",
+        )
+        .order_by(Subscription.expires_at.desc())
+        .first()
+    )
+    start = max(now, current.expires_at) if current else now
+    subscription = Subscription(
+        user_id=user.id,
+        monitor_list_id=monitor_list.id,
+        starts_at=start,
+        expires_at=start + timedelta(days=31 * max(1, min(months, 24))),
+        status="active",
+    )
+    db.add(subscription)
+    db.commit()
+    db.refresh(subscription)
+    return subscription
+
+
+def revoke_membership(db: Session, user: User) -> None:
+    now = utcnow()
+    subscriptions = (
+        db.query(Subscription)
+        .filter(
+            Subscription.user_id == user.id,
+            Subscription.status == "active",
+            Subscription.expires_at > now,
+        )
+        .all()
+    )
+    for subscription in subscriptions:
+        subscription.status = "canceled"
+        subscription.expires_at = now
+    db.commit()
 
 
 def serialize_summary(summary: AlertSummary) -> dict:
@@ -252,6 +327,37 @@ async def dashboard(settings: Settings = Depends(get_settings)):
     return get_dashboard_snapshot(market_data)
 
 
+@app.post("/api/analytics/event")
+async def analytics_event(
+    payload: AnalyticsEventRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    event_type = payload.event_type.strip().lower()
+    if event_type not in {"pageview", "heartbeat"}:
+        raise HTTPException(status_code=400, detail="Invalid analytics event")
+
+    visitor_id = payload.visitor_id.strip()[:120]
+    if len(visitor_id) < 8:
+        raise HTTPException(status_code=400, detail="Invalid visitor id")
+
+    user = optional_current_user(request, db, settings)
+    event = AnalyticsEvent(
+        user_id=user.id if user else None,
+        visitor_id=visitor_id,
+        event_type=event_type,
+        path=(payload.path or "/")[:500],
+        duration_seconds=max(0, min(int(payload.duration_seconds or 0), 1800)),
+        language=payload.language[:16],
+        viewport=payload.viewport[:32],
+        user_agent=request.headers.get("user-agent", "")[:1000],
+    )
+    db.add(event)
+    db.commit()
+    return {"ok": True}
+
+
 @app.get("/api/me")
 async def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     subscription = active_subscription(db, user)
@@ -298,6 +404,16 @@ async def current_payment(
             "trc20_address": settings.usdt_trc20_address,
             "erc20_address": settings.usdt_erc20_address,
             "status": "admin",
+        }
+    subscription = active_subscription(db, user)
+    if subscription:
+        return {
+            "member_active": True,
+            "amount_usdt": settings.monthly_price_usdt,
+            "trc20_address": settings.usdt_trc20_address,
+            "erc20_address": settings.usdt_erc20_address,
+            "status": "active",
+            "expires_at": subscription.expires_at.isoformat(),
         }
     payment = get_or_create_pending_payment(db, settings, user)
     return {
@@ -409,6 +525,7 @@ async def test_push(
 async def admin_overview(
     _: User = Depends(current_admin), db: Session = Depends(get_db)
 ):
+    now = utcnow()
     pending_payments = (
         db.query(ManualPayment)
         .filter(ManualPayment.status == "pending")
@@ -419,9 +536,81 @@ async def admin_overview(
     users = db.query(User).order_by(User.created_at.desc()).limit(50).all()
     sources = db.query(MonitoredSource).order_by(MonitoredSource.created_at.desc()).all()
     jobs = db.query(JobRun).order_by(JobRun.started_at.desc()).limit(20).all()
+    total_page_views = (
+        db.query(func.count(AnalyticsEvent.id))
+        .filter(AnalyticsEvent.event_type == "pageview")
+        .scalar()
+        or 0
+    )
+    total_duration_seconds = (
+        db.query(func.coalesce(func.sum(AnalyticsEvent.duration_seconds), 0)).scalar()
+        or 0
+    )
+    active_members = (
+        db.query(func.count(func.distinct(Subscription.user_id)))
+        .filter(Subscription.status == "active", Subscription.expires_at > now)
+        .scalar()
+        or 0
+    )
+    page_view_rows = (
+        db.query(AnalyticsEvent.path, func.count(AnalyticsEvent.id))
+        .filter(AnalyticsEvent.event_type == "pageview")
+        .group_by(AnalyticsEvent.path)
+        .order_by(func.count(AnalyticsEvent.id).desc())
+        .limit(20)
+        .all()
+    )
+    page_duration_rows = (
+        db.query(
+            AnalyticsEvent.path,
+            func.coalesce(func.sum(AnalyticsEvent.duration_seconds), 0),
+        )
+        .group_by(AnalyticsEvent.path)
+        .all()
+    )
+    page_seconds = {path: int(seconds or 0) for path, seconds in page_duration_rows}
+
+    user_stats = {}
+    for item in users:
+        views = (
+            db.query(func.count(AnalyticsEvent.id))
+            .filter(
+                AnalyticsEvent.user_id == item.id,
+                AnalyticsEvent.event_type == "pageview",
+            )
+            .scalar()
+            or 0
+        )
+        seconds = (
+            db.query(func.coalesce(func.sum(AnalyticsEvent.duration_seconds), 0))
+            .filter(AnalyticsEvent.user_id == item.id)
+            .scalar()
+            or 0
+        )
+        last_seen = (
+            db.query(func.max(AnalyticsEvent.created_at))
+            .filter(AnalyticsEvent.user_id == item.id)
+            .scalar()
+        )
+        subscription = active_subscription(db, item)
+        user_stats[item.id] = {
+            "page_views": int(views),
+            "total_seconds": int(seconds or 0),
+            "last_seen_at": last_seen.isoformat() if last_seen else None,
+            "subscription_active": bool(subscription),
+            "subscription_expires_at": subscription.expires_at.isoformat()
+            if subscription is not True and subscription
+            else None,
+        }
+
     return {
         "counts": {
             "users": db.query(func.count(User.id)).scalar(),
+            "active_members": active_members,
+            "page_views": total_page_views,
+            "avg_stay_seconds": round(
+                total_duration_seconds / max(total_page_views, 1)
+            ),
             "push_subscriptions": db.query(func.count(PushSubscription.id)).scalar(),
             "summaries": db.query(func.count(AlertSummary.id)).scalar(),
             "deliveries": db.query(func.count(Delivery.id)).scalar(),
@@ -445,8 +634,17 @@ async def admin_overview(
                 "last_login_at": item.last_login_at.isoformat()
                 if item.last_login_at
                 else None,
+                **user_stats[item.id],
             }
             for item in users
+        ],
+        "page_stats": [
+            {
+                "path": path,
+                "page_views": int(views or 0),
+                "total_seconds": page_seconds.get(path, 0),
+            }
+            for path, views in page_view_rows
         ],
         "sources": [
             {
@@ -503,6 +701,31 @@ async def admin_reject_payment(
     payment.tx_hash = payload.reason
     db.commit()
     return {"ok": True}
+
+
+@app.post("/api/admin/users/{user_id}/membership")
+async def admin_update_membership(
+    user_id: str,
+    payload: MembershipRequest,
+    _: User = Depends(current_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        return {"ok": True, "active": True, "expires_at": None, "admin_bypass": True}
+
+    if payload.active:
+        subscription = grant_membership(db, user, payload.months)
+        return {
+            "ok": True,
+            "active": True,
+            "expires_at": subscription.expires_at.isoformat(),
+        }
+
+    revoke_membership(db, user)
+    return {"ok": True, "active": False, "expires_at": None}
 
 
 @app.post("/api/admin/poll")

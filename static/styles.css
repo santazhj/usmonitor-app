@@ -543,6 +543,16 @@ mark {
   white-space: nowrap;
 }
 
+mark.neutral {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+mark.success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
 .source-item.pending mark {
   background: var(--amber-soft);
   color: var(--amber);
@@ -837,6 +847,109 @@ mark {
   align-items: center;
 }
 
+.admin-table {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-row {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+}
+
+.admin-table-head {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  padding-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.user-row {
+  grid-template-columns: minmax(220px, 1.7fr) minmax(130px, 1fr) 80px 90px 120px 64px;
+}
+
+.page-row {
+  grid-template-columns: minmax(260px, 1fr) 100px 120px;
+}
+
+.admin-row span {
+  min-width: 0;
+}
+
+.admin-row strong,
+.admin-row small {
+  display: block;
+}
+
+.admin-row small {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.switch-control {
+  display: inline-flex;
+  position: relative;
+  width: 46px;
+  height: 26px;
+  align-items: center;
+}
+
+.switch-control input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-control i {
+  width: 46px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.switch-control i::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.switch-control input:checked + i {
+  border-color: rgba(35, 197, 129, 0.5);
+  background: var(--green-soft);
+}
+
+.switch-control input:checked + i::after {
+  background: var(--green);
+  transform: translateX(20px);
+}
+
+.switch-control input:disabled + i {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .hidden {
   display: none !important;
 }
@@ -866,7 +979,10 @@ mark {
   .dashboard-heading,
   .dashboard-command,
   .inline-form,
-  .table-row {
+  .table-row,
+  .admin-row,
+  .user-row,
+  .page-row {
     grid-template-columns: 1fr;
   }
 
