@@ -94,6 +94,8 @@ const COPY = {
     "rail.alertsEyebrow": "提醒",
     "rail.alertsTitle": "最新情报",
     "alerts.signedOut": "登录后查看完整 alert feed。",
+    "alerts.loading": "正在加载并翻译最新情报...",
+    "alerts.loadFailed": "最新情报暂时加载失败，请稍后刷新。",
     "alerts.empty": "暂无提醒。",
     "alerts.viewSource": "查看原帖",
     "auth.eyebrow": "邮箱注册",
@@ -196,6 +198,8 @@ const COPY = {
     "rail.alertsEyebrow": "Alerts",
     "rail.alertsTitle": "Latest Intelligence",
     "alerts.signedOut": "Sign in to view the full alert feed.",
+    "alerts.loading": "Loading and translating latest alerts...",
+    "alerts.loadFailed": "Latest alerts could not be loaded. Please refresh later.",
     "alerts.empty": "No alerts yet.",
     "alerts.viewSource": "View source post",
     "auth.eyebrow": "Email Access",
@@ -670,7 +674,16 @@ function showSignedIn(me) {
   memberView.classList.remove("hidden");
   logoutBtn.classList.remove("hidden");
   adminLink.classList.toggle("hidden", !me.is_admin);
+  renderFeedLoading();
   updatePlanBadge(me);
+}
+
+function renderFeedLoading() {
+  feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.loading"))}</p>`;
+}
+
+function renderFeedError() {
+  feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.loadFailed"))}</p>`;
 }
 
 function moneyAddress(value) {
@@ -1047,7 +1060,7 @@ async function loadApp(existingMe) {
     subscriptionTitle
   )}</strong><span>${escapeHtml(subscriptionDetail)}</span>`;
 
-  await Promise.all([loadLists(), loadPayment(), loadFeed()]);
+  await Promise.allSettled([loadLists(), loadPayment(), loadFeed()]);
   updatePushStatus();
 }
 
@@ -1106,34 +1119,39 @@ async function loadPayment() {
 }
 
 async function loadFeed() {
-  const feed = await api(`/api/feed?lang=${encodeURIComponent(currentLanguage)}`);
-  if (!feed.length) {
-    feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.empty"))}</p>`;
-    return;
+  renderFeedLoading();
+  try {
+    const feed = await api(`/api/feed?lang=${encodeURIComponent(currentLanguage)}`);
+    if (!feed.length) {
+      feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.empty"))}</p>`;
+      return;
+    }
+    feedBox.innerHTML = feed
+      .map(
+        (item) => `
+          <article class="alert-card" id="alert-${escapeHtml(item.id)}">
+            <header>
+              <h3>${escapeHtml(item.title)}</h3>
+              <time>${formatDate(item.created_at)}</time>
+            </header>
+            <p>${escapeHtml(item.notification_text)}</p>
+            <ul>${item.bullets
+              .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
+              .join("")}</ul>
+            <div class="ticker-row">${item.tickers
+              .map((ticker) => `<span>${escapeHtml(ticker)}</span>`)
+              .join("")}</div>
+            <p class="why">${escapeHtml(item.why_it_matters)}</p>
+            <a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">
+              ${escapeHtml(t("alerts.viewSource"))}
+            </a>
+            <small>${escapeHtml(item.disclaimer)}</small>
+          </article>`
+      )
+      .join("");
+  } catch {
+    renderFeedError();
   }
-  feedBox.innerHTML = feed
-    .map(
-      (item) => `
-        <article class="alert-card" id="alert-${escapeHtml(item.id)}">
-          <header>
-            <h3>${escapeHtml(item.title)}</h3>
-            <time>${formatDate(item.created_at)}</time>
-          </header>
-          <p>${escapeHtml(item.notification_text)}</p>
-          <ul>${item.bullets
-            .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
-            .join("")}</ul>
-          <div class="ticker-row">${item.tickers
-            .map((ticker) => `<span>${escapeHtml(ticker)}</span>`)
-            .join("")}</div>
-          <p class="why">${escapeHtml(item.why_it_matters)}</p>
-          <a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">
-            ${escapeHtml(t("alerts.viewSource"))}
-          </a>
-          <small>${escapeHtml(item.disclaimer)}</small>
-        </article>`
-    )
-    .join("");
 }
 
 function updatePushStatus() {
