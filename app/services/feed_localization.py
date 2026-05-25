@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import json
+import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -11,17 +12,20 @@ from app.config import Settings
 from app.models import AlertSummary
 
 
-LOCALIZATION_CACHE_KEY = "feed_zh_v1"
+logger = logging.getLogger(__name__)
+
+LOCALIZATION_CACHE_KEY = "feed_zh_v2"
 LOCALIZATION_ROOT_KEY = "_serenity_localizations"
 TICKER_RE = re.compile(r"\$([A-Za-z][A-Za-z0-9.]{0,9})")
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 URL_RE = re.compile(r"https?://\S+")
+HANDLE_RE = re.compile(r"@\w+:?\s*")
 
 
 class FeedLocalizationItem(BaseModel):
     id: str
     title: str = Field(max_length=120)
-    notification_text: str = Field(max_length=220)
+    notification_text: str = Field(max_length=500)
     bullets: list[str] = Field(default_factory=list, max_length=3)
     why_it_matters: str = Field(max_length=400)
 
@@ -109,23 +113,60 @@ def _keyword_points(text: str) -> list[str]:
     return points[:3]
 
 
+def clean_source_for_translation(text: str) -> str:
+    text = URL_RE.sub("", text or "")
+    text = HANDLE_RE.sub("", text)
+    return " ".join(text.split()).strip()
+
+
+def rough_translate_fallback(text: str) -> str:
+    cleaned = clean_source_for_translation(text)
+    replacements = [
+        ("For people trying to do valuation analysis on", "如果想对"),
+        ("valuation analysis", "估值分析"),
+        ("are probably valued", "大概率估值在"),
+        ("probably", "大概"),
+        ("I think I deserve my own Netflix special after", "作者开玩笑说，经历"),
+        ("Did you listen anon?", "之前提醒过了，你注意到了吗？"),
+        ("is extremely early", "还处在非常早期"),
+        ("We're about to see", "接下来可能会看到"),
+        ("a ton of institutional inflow", "大量机构资金流入"),
+        ("institutional inflow", "机构资金流入"),
+        ("is the largest beneficiary", "是最大的受益者"),
+        ("brand new events this weekend", "这个周末的新催化"),
+        ("index inclusion", "指数纳入"),
+        ("Blackrock", "贝莱德"),
+        ("Vanguard", "先锋"),
+        ("MSCI", "MSCI"),
+        ("NASDAQ", "纳斯达克"),
+        ("Nasdaq", "纳斯达克"),
+        ("beneficiary", "受益者"),
+        ("extremely early", "非常早期"),
+        ("early", "早期"),
+        ("after", "之后"),
+        ("and", "和"),
+        ("or", "或"),
+        ("as", "作为"),
+        ("on", "关于"),
+    ]
+    translated = cleaned
+    for source, target in replacements:
+        translated = translated.replace(source, target)
+    return translated
+
+
 def fallback_zh_payload(summary: AlertSummary) -> dict[str, Any]:
-    text = URL_RE.sub("", source_text(summary)).strip()
+    text = clean_source_for_translation(source_text(summary))
     tickers = _tickers(text, summary.tickers)
-    points = _keyword_points(text)
     ticker_text = "、".join(f"${ticker}" for ticker in tickers) if tickers else "相关标的"
-    if points:
-        point_text = "，重点是" + "、".join(points)
-    else:
-        point_text = "，需要结合原帖上下文判断重点"
-    notification = f"@{summary.post.author_handle if summary.post else 'aleabitoreddit'}：原帖提到 {ticker_text}{point_text}。"
-    bullets = [f"涉及标的：{ticker_text}"]
-    bullets.extend(f"关注点：{point}" for point in points)
+    restatement = rough_translate_fallback(text)
+    notification = f"作者这条帖子的意思是（涉及 {ticker_text}）：{restatement}"
+    bullets = [f"涉及标的：{ticker_text}", "含义：这是原帖语义的中文转述，等待模型生成更精确版本。"]
     return {
         "title": "Serenity 新帖提醒",
-        "notification_text": notification[:180],
+        "notification_text": notification[:420],
         "bullets": bullets[:3],
-        "why_it_matters": "这是基于原帖正文生成的中文化摘要；仅用于情报浏览，不构成投资建议。",
+        "why_it_matters": "中文 feed 会优先使用模型翻译原帖全段意思；模型暂不可用时显示这版临时中文转述。",
     }
 
 
@@ -160,49 +201,58 @@ def generate_zh_batch(
     ]
     system_prompt = (
         "你是 US Monitor 的中文金融情报翻译器。"
-        "把每条 X 原帖翻译并压缩成简体中文 feed 卡片。"
-        "保留股票代码、关键公司名和链接含义，不输出买卖建议、仓位建议或收益承诺。"
-        "notification_text 要适合右侧栏阅读，不超过 120 个中文字符。"
-        "bullets 最多 3 条，每条必须是中文。"
+        "任务不是抽关键词，而是把每条 X 原帖的全段意思直接翻译/转述给中文用户。"
+        "用户不懂英文，所以 notification_text 必须让用户不看原帖也能理解作者完整表达。"
+        "保留股票代码、关键公司名、语气和因果关系；链接可概括为“附了链接”。"
+        "不要写“原帖提到”、不要说“需要结合原帖”、不要让用户自己去看原帖。"
+        "不要输出买卖建议、仓位建议或收益承诺。"
+        "notification_text 用自然中文，180-320 个中文字符；短帖可以更短。"
+        "bullets 最多 3 条，用中文提炼核心含义。"
     )
-    try:
-        from openai import OpenAI
+    use_responses_api = "openrouter.ai" not in settings.openai_base_url.lower()
+    if use_responses_api:
+        try:
+            from openai import OpenAI
 
-        client = OpenAI(**_client_kwargs(settings))
-        response = client.responses.parse(
-            model=settings.openai_summary_model,
-            input=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": f"请处理这些 feed items，按原 id 返回：\n{items}",
-                },
-            ],
-            text_format=FeedLocalizationBatch,
-        )
-        parsed_items: list[FeedLocalizationItem] = []
-        for output in response.output:
-            if output.type != "message":
-                continue
-            for item in output.content:
-                parsed = getattr(item, "parsed", None)
-                if parsed:
-                    parsed_items = parsed.items
-                    break
-        return {
-            item.id: {
-                "title": item.title,
-                "notification_text": item.notification_text,
-                "bullets": item.bullets,
-                "why_it_matters": item.why_it_matters,
+            client = OpenAI(**_client_kwargs(settings))
+            response = client.responses.parse(
+                model=settings.openai_summary_model,
+                input=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "请按原 id 返回。每条 notification_text 要直接复述作者整段话的中文意思，"
+                            "不是关键词摘要。\n"
+                            f"{json.dumps(items, ensure_ascii=False)}"
+                        ),
+                    },
+                ],
+                text_format=FeedLocalizationBatch,
+            )
+            parsed_items: list[FeedLocalizationItem] = []
+            for output in response.output:
+                if output.type != "message":
+                    continue
+                for item in output.content:
+                    parsed = getattr(item, "parsed", None)
+                    if parsed:
+                        parsed_items = parsed.items
+                        break
+            return {
+                item.id: {
+                    "title": item.title,
+                    "notification_text": item.notification_text,
+                    "bullets": item.bullets,
+                    "why_it_matters": item.why_it_matters,
+                }
+                for item in parsed_items
             }
-            for item in parsed_items
-        }
-    except Exception:
-        pass
+        except Exception as exc:
+            logger.warning("Responses feed localization failed: %s", exc.__class__.__name__)
 
     try:
         from openai import OpenAI
@@ -236,7 +286,8 @@ def generate_zh_batch(
             }
             for item in parsed.items
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("Chat feed localization failed: %s", exc.__class__.__name__)
         return {}
 
 
@@ -260,7 +311,8 @@ def localize_feed_for_zh(
     for summary in pending:
         payload = generated.get(summary.id) or fallback_zh_payload(summary)
         localized[summary.id] = payload
-        cache_zh(summary, payload)
-    if pending:
+        if summary.id in generated:
+            cache_zh(summary, payload)
+    if generated:
         db.commit()
     return localized

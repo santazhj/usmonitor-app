@@ -1,7 +1,6 @@
 from app.config import Settings
 from app.models import AlertSummary, XPost
 from app.services.feed_localization import (
-    LOCALIZATION_CACHE_KEY,
     LOCALIZATION_ROOT_KEY,
     existing_chinese_payload,
     fallback_zh_payload,
@@ -53,16 +52,15 @@ def test_fallback_zh_payload_uses_finance_aware_chinese_preview():
     assert "institutional" not in payload["notification_text"].lower()
 
 
-def test_localize_feed_for_zh_caches_fallback_without_api_key():
+def test_localize_feed_for_zh_does_not_cache_fallback_without_api_key():
     summary = summary_with_english_post()
     db = FakeDb()
 
     localized = localize_feed_for_zh(Settings(openai_api_key=""), db, [summary])
 
     assert localized[summary.id]["title"] == "Serenity 新帖提醒"
-    assert db.commits == 1
-    cached = summary.post.raw_json[LOCALIZATION_ROOT_KEY][LOCALIZATION_CACHE_KEY]
-    assert cached["notification_text"] == localized[summary.id]["notification_text"]
+    assert db.commits == 0
+    assert LOCALIZATION_ROOT_KEY not in summary.post.raw_json
 
 
 def test_existing_chinese_payload_requires_chinese_notification_body():
