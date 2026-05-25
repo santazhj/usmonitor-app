@@ -145,11 +145,61 @@ h3 {
   text-decoration: none;
 }
 
+.brand-cluster {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .brand img {
   width: 34px;
   height: 34px;
   border-radius: 7px;
   background: var(--cyan);
+}
+
+.plan-badge {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.plan-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.plan-badge[data-plan-status="vip"] {
+  border-color: rgba(0, 125, 117, 0.35);
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+
+.plan-badge[data-plan-status="vip"]::before {
+  background: var(--cyan);
+}
+
+.plan-badge[data-plan-status="free"] {
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.plan-badge[data-plan-status="loading"]::before {
+  background: var(--amber);
 }
 
 .nav-actions,
@@ -1060,6 +1110,11 @@ mark.success {
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 2px;
+  }
+
+  .brand-cluster {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .quiet-link,

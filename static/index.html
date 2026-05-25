@@ -12,10 +12,15 @@
   <body>
     <main class="shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="US Monitor">
-          <img src="/icon.svg" alt="" />
-          <span>US Monitor</span>
-        </a>
+        <div class="brand-cluster">
+          <a class="brand" href="/" aria-label="US Monitor">
+            <img src="/icon.svg" alt="" />
+            <span>US Monitor</span>
+          </a>
+          <span id="planBadge" class="plan-badge" data-plan-status="loading" data-i18n="plan.loading">
+            检查权限
+          </span>
+        </div>
         <nav class="nav-actions" aria-label="Primary">
           <a class="quiet-link" href="#dashboard" data-i18n="nav.dashboard">看板</a>
           <a class="quiet-link" href="#alerts" data-i18n="nav.alerts">情报</a>
@@ -189,6 +194,6 @@
       </section>
     </aside>
 
-    <script src="/static/app.js?v=20260525-institutional" type="module"></script>
+    <script src="/static/app.js?v=20260525-plan-badge" type="module"></script>
   </body>
 </html>

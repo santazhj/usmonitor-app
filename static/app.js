@@ -12,6 +12,7 @@ const listBox = document.querySelector("#listBox");
 const feedBox = document.querySelector("#feedBox");
 const logoutBtn = document.querySelector("#logoutBtn");
 const adminLink = document.querySelector("#adminLink");
+const planBadge = document.querySelector("#planBadge");
 const languageToggle = document.querySelector("#languageToggle");
 const dashboardMetrics = document.querySelector("#dashboardMetrics");
 const categoryTabs = document.querySelector("#categoryTabs");
@@ -43,6 +44,11 @@ const COPY = {
     "nav.alerts": "情报",
     "nav.account": "账户",
     "nav.logout": "退出",
+    "plan.loading": "检查权限",
+    "plan.vip": "VIP 版本",
+    "plan.free": "普通版本",
+    "plan.vipTitle": "当前账户已开通 VIP 权限",
+    "plan.freeTitle": "当前为普通版本",
     "hero.eyebrow": "AI 基础设施",
     "hero.title": "美股 AI 产业链终端",
     "hero.lede":
@@ -137,6 +143,11 @@ const COPY = {
     "nav.alerts": "Alerts",
     "nav.account": "Account",
     "nav.logout": "Sign out",
+    "plan.loading": "Checking access",
+    "plan.vip": "VIP version",
+    "plan.free": "Free version",
+    "plan.vipTitle": "This account has VIP access.",
+    "plan.freeTitle": "This account is on the free version.",
     "hero.eyebrow": "AI Infrastructure",
     "hero.title": "US AI Supply Chain Terminal",
     "hero.lede":
@@ -429,6 +440,7 @@ let searchQuery = localStorage.getItem(SEARCH_KEY) || "";
 let sortField = localStorage.getItem(SORT_FIELD_KEY) || DEFAULT_SORT_FIELD;
 let sortDirection = localStorage.getItem(SORT_DIRECTION_KEY) || DEFAULT_SORT_DIRECTION;
 let activeDrawerTicker = null;
+let authChecked = false;
 let currentUser = null;
 let currentLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY));
 let lastEngagementAt = Date.now();
@@ -614,22 +626,41 @@ function applyStaticCopy() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
     element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
   });
+  updatePlanBadge(currentUser);
+}
+
+function updatePlanBadge(me) {
+  if (!planBadge) return;
+  if (!authChecked && !me) {
+    planBadge.textContent = t("plan.loading");
+    planBadge.dataset.planStatus = "loading";
+    planBadge.setAttribute("title", t("plan.loading"));
+    return;
+  }
+  const isVip = Boolean(me?.subscription?.active);
+  planBadge.textContent = isVip ? t("plan.vip") : t("plan.free");
+  planBadge.dataset.planStatus = isVip ? "vip" : "free";
+  planBadge.setAttribute("title", isVip ? t("plan.vipTitle") : t("plan.freeTitle"));
 }
 
 function showSignedOut() {
   currentUser = null;
+  authChecked = true;
   authView.classList.remove("hidden");
   memberView.classList.add("hidden");
   logoutBtn.classList.add("hidden");
   adminLink.classList.add("hidden");
+  updatePlanBadge(null);
 }
 
 function showSignedIn(me) {
   currentUser = me;
+  authChecked = true;
   authView.classList.add("hidden");
   memberView.classList.remove("hidden");
   logoutBtn.classList.remove("hidden");
   adminLink.classList.toggle("hidden", !me.is_admin);
+  updatePlanBadge(me);
 }
 
 function moneyAddress(value) {
