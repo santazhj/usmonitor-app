@@ -211,7 +211,7 @@ async function refresh(mode = "quick") {
   els.tableStatus.textContent = mode === "full" ? "完整扫描中..." : "快速刷新中...";
   try {
     payload = await api(
-      `/api/options/scan?tickers=${encodeURIComponent(tickers.join(","))}&mode=${encodeURIComponent(mode)}`
+      `/api/options/scan?tickers=${encodeURIComponent(tickers.join(","))}&mode=${encodeURIComponent(mode)}&allowInitialFull=false`
     );
     if (!payload.underlyings.some((row) => row.ticker === selectedTicker)) {
       selectedTicker = payload.underlyings[0]?.ticker || "";
@@ -354,7 +354,10 @@ function renderTable() {
     ? `显示 ${rows.length}/${payload.underlyings.length} 个标的`
     : "等待扫描";
   if (!rows.length) {
-    els.tableBody.innerHTML = `<tr><td colspan="${columns.length}" class="empty-table">暂无数据。点完整扫描开始。</td></tr>`;
+    const message = payload?.summary?.fullScanRequired
+      ? "当前列表还没有完整扫描缓存。点击“完整扫描”后，后续快速刷新会很快。"
+      : "暂无数据。点完整扫描开始。";
+    els.tableBody.innerHTML = `<tr><td colspan="${columns.length}" class="empty-table">${message}</td></tr>`;
     return;
   }
   els.tableBody.innerHTML = rows

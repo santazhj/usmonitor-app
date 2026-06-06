@@ -574,6 +574,30 @@ async def build_full_payload(settings: Settings, tickers: list[str]) -> dict[str
     return payload
 
 
+def _quick_no_cache_payload(tickers: list[str]) -> dict[str, Any]:
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "summary": {
+            "underlyings": len(tickers),
+            "contracts": 0,
+            "validContracts": 0,
+            "analyzableContractRate": 0.0,
+            "validQuoteRate": 0.0,
+            "bestPer": None,
+            "medianIv": None,
+            "medianSpread": None,
+            "medianBuffer": None,
+            "lastRefresh": now,
+            "refreshMode": "quick_no_cache",
+            "quickContractsRefreshed": 0,
+            "fullScanRequired": True,
+        },
+        "underlyings": [],
+        "errors": [],
+        "tickers": tickers,
+    }
+
+
 async def _refresh_best_option(
     client: httpx.AsyncClient,
     settings: Settings,
@@ -600,16 +624,22 @@ async def _refresh_best_option(
     return refreshed
 
 
-async def build_quick_payload(settings: Settings, tickers: list[str]) -> dict[str, Any]:
+async def build_quick_payload(
+    settings: Settings,
+    tickers: list[str],
+    allow_initial_full: bool = False,
+) -> dict[str, Any]:
     key = tuple(tickers)
     async with _scan_cache_lock:
         entry = _scan_cache.get(key)
         cached = copy.deepcopy(entry.payload) if entry else None
         full_scanned_at = entry.full_scanned_at if entry else None
-    if cached is None:
+    if cached is None and allow_initial_full:
         payload = await build_full_payload(settings, tickers)
         payload["summary"]["refreshMode"] = "full_initial"
         return payload
+    if cached is None:
+        return _quick_no_cache_payload(tickers)
 
     errors = list(cached.get("errors") or [])
     refreshed_count = 0
@@ -657,13 +687,14 @@ async def build_options_payload(
     settings: Settings,
     raw_tickers: str | list[str] | None = None,
     mode: str = "quick",
+    allow_initial_full: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     tickers = normalize_tickers(raw_tickers)
     payload = (
         await build_full_payload(settings, tickers)
         if mode == "full"
-        else await build_quick_payload(settings, tickers)
+        else await build_quick_payload(settings, tickers, allow_initial_full=allow_initial_full)
     )
     payload["summary"]["elapsedSeconds"] = round(time.perf_counter() - started, 2)
     return payload

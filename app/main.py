@@ -384,9 +384,10 @@ async def dashboard(
 async def options_scan(
     tickers: str = "",
     mode: str = "quick",
+    allowInitialFull: bool = False,
     settings: Settings = Depends(get_settings),
 ):
-    return await build_options_payload(settings, tickers, mode)
+    return await build_options_payload(settings, tickers, mode, allow_initial_full=allowInitialFull)
 
 
 @app.get("/api/options/tickers")
