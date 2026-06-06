@@ -40,6 +40,7 @@ fallback summaries so the end-to-end flow can be tested without model spend.
 - `ADMIN_EMAILS`
 - `OPENAI_API_KEY`
 - `X_BEARER_TOKEN`
+- `MASSIVE_API_KEY`
 - `RESEND_API_KEY`
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`

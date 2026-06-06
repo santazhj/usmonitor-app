@@ -305,6 +305,16 @@ def main() -> int:
         **common,
         "SECRET_KEY": secret_key,
         "ADMIN_EMAILS": settings.get("ADMIN_EMAILS", "santazhj@gmail.com"),
+        "MASSIVE_API_KEY": settings.get(
+            "MASSIVE_API_KEY", existing_web_env.get("MASSIVE_API_KEY", "")
+        ),
+        "MASSIVE_BASE_URL": settings.get(
+            "MASSIVE_BASE_URL", "http://api.massiveprivateserver.site"
+        ),
+        "MASSIVE_CACHE_TTL_SECONDS": settings.get("MASSIVE_CACHE_TTL_SECONDS", "75"),
+        "MASSIVE_FUNDAMENTALS_CACHE_TTL_SECONDS": settings.get(
+            "MASSIVE_FUNDAMENTALS_CACHE_TTL_SECONDS", "21600"
+        ),
         "RESEND_API_KEY": settings["RESEND_API_KEY"],
         "EMAIL_FROM": settings.get("EMAIL_FROM", "US Monitor <alerts@usmonitor.app>"),
         "USDT_TRC20_ADDRESS": settings["USDT_TRC20_ADDRESS"],
