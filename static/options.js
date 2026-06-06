@@ -35,23 +35,23 @@ const els = {
 };
 
 const columns = [
-  { label: "Ticker", key: "ticker" },
-  { label: "Best Contract" },
-  { label: "Edge" },
+  { label: "标的", key: "ticker" },
+  { label: "合约" },
+  { label: "性价" },
   { label: "PER", key: "put_edge_ratio" },
-  { label: "Score", key: "score" },
-  { label: "Spot", key: "spot" },
+  { label: "质量", key: "score" },
+  { label: "现价", key: "spot" },
   { label: "Bid / Ask", key: "bid" },
-  { label: "Credit", key: "target_credit" },
-  { label: "BS Price", key: "bs_put_price" },
-  { label: "Premium/BS", key: "premium_vs_bs_pct" },
-  { label: "Bid Ann Yield", key: "ann_yield_bid" },
+  { label: "权利金", key: "target_credit" },
+  { label: "BS", key: "bs_put_price", title: "Black-Scholes 理论价" },
+  { label: "权/BS", key: "premium_vs_bs_pct", title: "目标权利金相对 Black-Scholes 理论价的溢价/折价；正数代表市场权利金高于模型价。" },
+  { label: "年化", key: "ann_yield_bid" },
   { label: "Delta", key: "delta" },
   { label: "IV", key: "iv" },
   { label: "OI", key: "open_interest" },
-  { label: "Spread", key: "spread_pct" },
+  { label: "Spr", key: "spread_pct" },
   { label: "Buffer", key: "breakeven_buffer" },
-  { label: "Quote" }
+  { label: "报价" }
 ];
 
 let watchlists = loadWatchlists();
@@ -85,10 +85,7 @@ function activeTickers() {
 function scanTickers() {
   return Array.from(
     new Set(
-      Object.values(watchlists.lists || {})
-        .flat()
-        .map((ticker) => String(ticker).trim().toUpperCase())
-        .filter(Boolean)
+      activeTickers().map((ticker) => String(ticker).trim().toUpperCase()).filter(Boolean)
     )
   );
 }
@@ -136,8 +133,46 @@ function time(value) {
   });
 }
 
-function badge(label, tone = "zinc") {
-  return `<span class="option-badge ${tone}">${escapeHtml(label || "--")}</span>`;
+function compactEdge(label) {
+  const labels = {
+    Extreme: "极高",
+    Good: "良好",
+    Watch: "观察",
+    Normal: "普通",
+    Stale: "旧",
+    Liquidity: "流动性",
+    "Data Gap": "缺数",
+    Event: "事件",
+    "极高性价比": "极高",
+    "好性价比": "良好",
+    "可观察": "观察",
+    "旧报价": "旧",
+    "数据不足": "缺数",
+    "流动性陷阱": "流动性",
+    "事件风险": "事件"
+  };
+  return labels[label] || label || "--";
+}
+
+function compactQuote(label) {
+  const labels = {
+    Live: "实时",
+    "Close Ref": "收盘",
+    "盘中实时": "实时",
+    "收盘参考": "收盘"
+  };
+  return labels[label] || label || "--";
+}
+
+function compactContract(row) {
+  const expiry = row.expiry || row.expiration || "";
+  const strike = money(row.strike).replace(/\.00$/, "");
+  if (expiry && Number.isFinite(Number(row.strike))) return `${expiry.slice(5)} P${strike}`;
+  return String(row.topContract || "--").replace(/^\d{4}-/, "");
+}
+
+function badge(label, tone = "zinc", title = label) {
+  return `<span class="option-badge ${tone}" title="${escapeHtml(title || label || "")}">${escapeHtml(label || "--")}</span>`;
 }
 
 function edgeTone(edge) {
@@ -260,7 +295,8 @@ function sortValue(row, key) {
 }
 
 function visibleRows() {
-  let rows = payload?.underlyings || [];
+  const activeSet = new Set(scanTickers());
+  let rows = (payload?.underlyings || []).filter((row) => activeSet.has(String(row.ticker || "").toUpperCase()));
   if (filterMode === "valid") rows = rows.filter((row) => row.platform_valid !== false);
   const query = tableQuery.trim().toUpperCase();
   if (query) {
@@ -296,12 +332,13 @@ function toggleSort(key) {
 function renderHead() {
   els.tableHead.innerHTML = columns
     .map((column) => {
-      if (!column.key) return `<th>${escapeHtml(column.label)}</th>`;
+      const title = column.title ? ` title="${escapeHtml(column.title)}"` : "";
+      if (!column.key) return `<th${title}>${escapeHtml(column.label)}</th>`;
       const arrow =
         sortConfig.key === column.key ? (sortConfig.direction === "desc" ? "↓" : "↑") : "↕";
       const active = sortConfig.key === column.key ? "active" : "";
       return `
-        <th>
+        <th${title}>
           <button class="option-sort ${active}" data-sort-key="${escapeHtml(column.key)}" type="button">
             ${escapeHtml(column.label)} <span>${arrow}</span>
           </button>
@@ -325,8 +362,8 @@ function renderTable() {
       (row) => `
         <tr class="${row.ticker === selectedTicker ? "selected" : ""}" data-row-ticker="${escapeHtml(row.ticker)}">
           <td class="mono strong">${escapeHtml(row.ticker)}</td>
-          <td>${badge(row.topContract, "sky")}</td>
-          <td>${badge(row.edge_flag, edgeTone(row.edge_flag))}</td>
+          <td>${badge(compactContract(row), "sky", row.topContract)}</td>
+          <td>${badge(compactEdge(row.edge_flag), edgeTone(row.edge_flag), row.edge_flag)}</td>
           <td class="mono edge">${number(row.put_edge_ratio)}</td>
           <td class="mono">${number(row.score)}</td>
           <td class="mono">${money(row.spot)}</td>
@@ -340,7 +377,7 @@ function renderTable() {
           <td class="mono">${number(row.open_interest, 0)}</td>
           <td class="mono">${pct(row.spread_pct)}</td>
           <td class="mono">${pct(row.breakeven_buffer)}</td>
-          <td>${badge(row.quote_mode, row.quote_mode === "Live" ? "green" : "amber")}</td>
+          <td>${badge(compactQuote(row.quote_mode), row.quote_mode === "Live" ? "green" : "amber", row.quote_mode)}</td>
         </tr>`
     )
     .join("");
@@ -400,7 +437,7 @@ function renderDetail() {
     <div class="detail-metrics">
       <article><span>PER</span><strong class="edge">${number(option.put_edge_ratio)}</strong></article>
       <article><span>BS Price</span><strong>${money(option.bs_put_price)}</strong></article>
-      <article><span>Premium/BS</span><strong>${pct(option.premium_vs_bs_pct)}</strong></article>
+      <article title="目标权利金相对 Black-Scholes 理论价的溢价/折价；正数代表市场权利金高于模型价。"><span>权利金/BS</span><strong>${pct(option.premium_vs_bs_pct)}</strong></article>
       <article><span>Buffer / EM</span><strong>${number(option.buffer_em_ratio)}x</strong></article>
     </div>
     <div class="detail-grid">
@@ -433,8 +470,11 @@ function createList() {
   const name = prompt("新自选列表名称");
   if (!name) return;
   watchlists = { active: name, lists: { ...watchlists.lists, [name]: [] } };
+  payload = { summary: {}, underlyings: [] };
+  selectedTicker = "";
+  selectedOptionTicker = "";
   saveWatchlists();
-  renderWatchlists();
+  render();
 }
 
 function deleteList() {
@@ -443,8 +483,12 @@ function deleteList() {
   const next = { ...watchlists.lists };
   delete next[watchlists.active];
   watchlists = { active: Object.keys(next)[0], lists: next };
+  payload = null;
+  selectedTicker = "";
+  selectedOptionTicker = "";
   saveWatchlists();
-  renderWatchlists();
+  render();
+  refresh("quick");
 }
 
 async function searchTickers(query) {
@@ -513,8 +557,12 @@ els.tickerChips.addEventListener("click", (event) => {
 
 els.watchlistSelect.addEventListener("change", (event) => {
   watchlists.active = event.target.value;
+  payload = null;
+  selectedTicker = "";
+  selectedOptionTicker = "";
   saveWatchlists();
-  renderWatchlists();
+  render();
+  refresh("quick");
 });
 els.newListBtn.addEventListener("click", createList);
 els.deleteListBtn.addEventListener("click", deleteList);

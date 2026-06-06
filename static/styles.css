@@ -1580,9 +1580,9 @@ select:focus {
 
 .options-table {
   width: 100%;
-  min-width: 1420px;
+  min-width: 1320px;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .options-table th {
@@ -1592,18 +1592,18 @@ select:focus {
   background: #09090b;
   border-bottom: 1px solid var(--line);
   color: var(--faint);
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: left;
   text-transform: uppercase;
 }
 
 .option-sort {
-  min-height: 28px;
+  min-height: 24px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--faint);
-  padding: 0 6px;
+  padding: 0 4px;
   text-align: left;
 }
 
@@ -1615,7 +1615,8 @@ select:focus {
 
 .options-table td {
   border-bottom: 1px solid rgba(39, 39, 42, 0.8);
-  padding: 8px 10px;
+  padding: 6px 8px;
+  line-height: 1.15;
   white-space: nowrap;
 }
 
@@ -1642,9 +1643,11 @@ select:focus {
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 7px;
-  padding: 3px 7px;
+  padding: 2px 6px;
   font-size: 11px;
   font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .option-badge.green {
