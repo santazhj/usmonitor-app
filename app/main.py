@@ -38,6 +38,7 @@ from app.services.dashboard import (
 )
 from app.services.feed_localization import localize_feed_for_zh
 from app.services.market_data import fetch_dashboard_market_data
+from app.services.options_analysis import build_options_payload, search_option_tickers
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
 from app.services.seed import seed_defaults
@@ -266,6 +267,11 @@ async def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/options")
+async def options_page():
+    return FileResponse(STATIC_DIR / "options.html")
+
+
 @app.get("/admin")
 async def admin_page():
     return FileResponse(STATIC_DIR / "admin.html")
@@ -372,6 +378,23 @@ async def dashboard(
     tickers = dashboard_tickers() + [item["ticker"] for item in dynamic_rows]
     market_data = await fetch_dashboard_market_data(settings, tickers)
     return get_dashboard_snapshot(market_data, dynamic_rows, mentions)
+
+
+@app.get("/api/options/scan")
+async def options_scan(
+    tickers: str = "",
+    mode: str = "quick",
+    settings: Settings = Depends(get_settings),
+):
+    return await build_options_payload(settings, tickers, mode)
+
+
+@app.get("/api/options/tickers")
+async def options_ticker_search(
+    q: str = "",
+    settings: Settings = Depends(get_settings),
+):
+    return {"results": await search_option_tickers(settings, q)}
 
 
 @app.post("/api/analytics/event")

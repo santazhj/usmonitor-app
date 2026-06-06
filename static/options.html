@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#09090b" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260606-terminal-options" />
+    <title>Options Terminal - US Monitor</title>
+  </head>
+  <body class="terminal-page">
+    <main class="terminal-shell">
+      <header class="topbar terminal-topbar">
+        <div class="brand-cluster">
+          <a class="brand" href="/" aria-label="US Monitor">
+            <img src="/icon.svg" alt="" />
+            <span>US Monitor</span>
+          </a>
+          <span class="plan-badge" data-plan-status="vip">Options Terminal</span>
+        </div>
+        <nav class="nav-actions" aria-label="Primary">
+          <a class="quiet-link" href="/">Stocks</a>
+          <a class="quiet-link active" href="/options">Options</a>
+          <button id="quickRefreshBtn" class="primary terminal-action" type="button">快速刷新</button>
+          <button id="fullScanBtn" class="secondary terminal-action" type="button">完整扫描</button>
+        </nav>
+      </header>
+
+      <section class="options-layout">
+        <aside class="terminal-panel watchlist-panel">
+          <div class="panel-heading">
+            <span>自选列表</span>
+            <div class="icon-actions">
+              <button id="newListBtn" class="icon-button-small" type="button" aria-label="New list">+</button>
+              <button id="deleteListBtn" class="icon-button-small" type="button" aria-label="Delete list">⌫</button>
+            </div>
+          </div>
+          <select id="watchlistSelect" class="terminal-select"></select>
+          <div class="ticker-search-wrap">
+            <span class="search-glyph">⌕</span>
+            <input id="tickerSearch" class="terminal-input" autocomplete="off" placeholder="搜索全美股 ticker 添加" />
+            <div id="tickerSuggestions" class="ticker-suggestions hidden"></div>
+          </div>
+          <div id="tickerChips" class="ticker-chip-grid"></div>
+        </aside>
+
+        <section class="options-main">
+          <section class="options-kpis">
+            <article class="terminal-kpi">
+              <span>标的数</span>
+              <strong id="kpiUnderlyings">--</strong>
+              <small id="kpiScope">--</small>
+            </article>
+            <article class="terminal-kpi">
+              <span>合约数</span>
+              <strong id="kpiContracts">--</strong>
+              <small id="kpiValid">--</small>
+            </article>
+            <article class="terminal-kpi">
+              <span>可分析合约率</span>
+              <strong id="kpiRate">--</strong>
+              <div class="mini-progress"><i id="kpiRateBar"></i></div>
+            </article>
+            <article class="terminal-kpi">
+              <span>最高 PER</span>
+              <strong id="kpiBestPer">--</strong>
+              <small>默认按 PER 倒序</small>
+            </article>
+            <article class="terminal-kpi">
+              <span>中位 IV / Spread</span>
+              <strong id="kpiIv">--</strong>
+              <small id="kpiSpread">--</small>
+            </article>
+            <article class="terminal-kpi">
+              <span>最近刷新</span>
+              <strong id="kpiRefresh">--</strong>
+              <small id="kpiMode">--</small>
+            </article>
+          </section>
+
+          <section class="terminal-panel">
+            <div class="terminal-toolbar">
+              <label class="terminal-filter">
+                <span>过滤</span>
+                <select id="validFilter" class="terminal-select">
+                  <option value="all">全部</option>
+                  <option value="valid">市场有效</option>
+                </select>
+              </label>
+              <div class="table-search-wrap">
+                <span class="search-glyph">⌕</span>
+                <input id="tableSearch" class="terminal-input" autocomplete="off" placeholder="搜索表格" />
+              </div>
+              <p id="tableStatus" class="table-status terminal-status">等待扫描</p>
+            </div>
+            <div class="options-table-scroll">
+              <table class="options-table">
+                <thead>
+                  <tr id="optionsTableHead"></tr>
+                </thead>
+                <tbody id="optionsTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="optionDetail" class="terminal-panel option-detail hidden"></section>
+        </section>
+      </section>
+    </main>
+    <script src="/static/options.js?v=20260606-terminal-options" type="module"></script>
+  </body>
+</html>

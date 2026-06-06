@@ -42,7 +42,7 @@ services:
       - key: MASSIVE_API_KEY
         sync: false
       - key: MASSIVE_BASE_URL
-        sync: false
+        value: http://api.massiveprivateserver.site
       - key: MASSIVE_CACHE_TTL_SECONDS
         value: "75"
       - key: MASSIVE_FUNDAMENTALS_CACHE_TTL_SECONDS
