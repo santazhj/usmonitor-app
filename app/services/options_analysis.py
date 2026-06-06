@@ -224,7 +224,7 @@ def _liquidity_factor(spread_pct: float, open_interest: int) -> float:
 
 def _freshness_factor(quote_age_seconds: float | None, closed_reference: bool) -> float:
     if closed_reference:
-        return 0.75
+        return 1.0
     if quote_age_seconds is None:
         return 0.0
     return max(0.0, min(1.0, 1 - quote_age_seconds / QUOTE_STALE_SECONDS))
@@ -365,7 +365,6 @@ def _option_record(
         / max(delta_abs or 0, 0.01)
         * max(buffer_em_ratio or 0, 0)
         * liquidity
-        * freshness
     )
     bs_price = _black_scholes_put_price(spot, strike, dte, iv)
     premium_vs_bs = target_credit / bs_price - 1 if bs_price and bs_price > 0 else None
