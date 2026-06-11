@@ -56,7 +56,7 @@ DEFAULT_OPTION_TICKERS = [
 ]
 
 MIN_DTE = 7
-MAX_DTE = 60
+MAX_DTE = 365
 MAX_SCAN_DTE = 365
 MIN_DELTA_ABS = 0.10
 MAX_DELTA_ABS = 0.35
@@ -677,11 +677,9 @@ def _summarize(records: list[dict[str, Any]], underlyings: list[dict[str, Any]])
     }
 
 
-def _top_options(records: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
-    valid = [item for item in records if item.get("platform_valid")]
-    selected = valid or records
+def _sort_option_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(
-        selected,
+        records,
         key=lambda item: (
             _to_float(item.get("monthly_score"), 0.0) or 0.0,
             _to_float(item.get("bucket_rank"), 0.0) or 0.0,
@@ -690,7 +688,42 @@ def _top_options(records: list[dict[str, Any]], limit: int = 10) -> list[dict[st
             _to_float(item.get("put_edge_ratio"), 0.0) or 0.0,
         ),
         reverse=True,
-    )[:limit]
+    )
+
+
+def _option_identity(record: dict[str, Any]) -> str:
+    return str(record.get("option_ticker") or f"{record.get('ticker')}:{record.get('expiry')}:{record.get('strike')}")
+
+
+def _top_options(records: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
+    valid = [item for item in records if item.get("platform_valid")]
+    selected = valid or records
+    return _sort_option_records(selected)[:limit]
+
+
+def _top_options_with_expiry_coverage(records: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = list(_top_options(records, limit))
+    expiries = sorted({str(item.get("expiry") or "") for item in records if item.get("expiry")})
+    for expiry in expiries:
+        expiry_records = [item for item in records if str(item.get("expiry") or "") == expiry]
+        valid = [item for item in expiry_records if item.get("platform_valid")]
+        ranked = _sort_option_records(valid or expiry_records)
+        if ranked:
+            selected.append(ranked[0])
+    deduped: dict[str, dict[str, Any]] = {}
+    for item in selected:
+        deduped.setdefault(_option_identity(item), item)
+    return _sort_option_records(list(deduped.values()))
+
+
+def _expiry_summary(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    expiries: dict[str, int] = {}
+    for record in records:
+        expiry = str(record.get("expiry") or "")
+        dte = _to_int(record.get("dte"), -1)
+        if expiry and 0 <= dte <= MAX_SCAN_DTE:
+            expiries[expiry] = min(dte, expiries.get(expiry, dte))
+    return [{"expiry": expiry, "dte": dte} for expiry, dte in sorted(expiries.items())]
 
 
 def _payload_from_records(
@@ -708,7 +741,7 @@ def _payload_from_records(
         group = by_ticker.get(ticker, [])
         if not group:
             continue
-        top = _top_options(group)
+        top = _top_options_with_expiry_coverage(group)
         if not top:
             continue
         best = dict(top[0])
@@ -729,6 +762,7 @@ def _payload_from_records(
     return {
         "summary": {**_summarize(records, underlyings), "dataSource": source},
         "underlyings": underlyings,
+        "expiries": _expiry_summary(records),
         "errors": errors,
         "tickers": tickers,
     }
@@ -912,6 +946,7 @@ def _quick_no_cache_payload(tickers: list[str], source: str = "massive") -> dict
             "fullScanRequired": True,
         },
         "underlyings": [],
+        "expiries": [],
         "errors": [],
         "tickers": tickers,
     }
@@ -955,7 +990,7 @@ async def _refresh_best_option(
             break
     else:
         top_options.insert(0, refreshed)
-    refreshed["topOptions"] = top_options[:10]
+    refreshed["topOptions"] = top_options
     return refreshed
 
 

@@ -77,6 +77,7 @@ const TICKER_NAMES = {
 const WATCHLIST_KEY = "usmonitor.options.watchlists";
 const WATCHLIST_VERSION = 5;
 const SOURCE_KEY = "usmonitor.options.dataSource";
+const MAX_EXPIRY_DTE = 365;
 
 const els = {
   quickRefreshBtn: document.querySelector("#quickRefreshBtn"),
@@ -118,7 +119,7 @@ const els = {
 const columns = [
   { label: "标的", key: "ticker", title: "该行期权对应的正股 ticker。" },
   { label: "合约", title: "同一标的过滤后选出的最佳单个 put 合约。" },
-  { label: "周期", key: "dte_bucket", title: "到期期限分桶；默认视图聚焦 31-75 天月度期权。" },
+  { label: "期限桶", key: "dte_bucket", title: "用于公平排名的到期期限桶；上方到期日筛选使用具体到期日。" },
   { label: "标签", title: "当前 PER 性价比分档的简短标签。" },
   { label: "Cycle PER", key: "cycle_put_edge_ratio", title: "Cycle PER = 到期收益 / |Delta| × min(Buffer / Expected Move, 2)。比年化 PER 更适合比较月度期权。" },
   { label: "桶排名", key: "bucket_rank", title: "在同一个到期期限桶内，Cycle PER 的百分位排名。" },
@@ -147,7 +148,7 @@ let selectedTicker = "";
 let selectedOptionTicker = "";
 let expandedOptionKey = "";
 let filterMode = "all";
-let dteFilter = "monthly";
+let expiryFilter = "all";
 let tableQuery = "";
 let suggestions = [];
 let highlightedSuggestionIndex = -1;
@@ -303,6 +304,71 @@ function expiryYield(row) {
   const strike = Number(row?.strike);
   if (!Number.isFinite(credit) || !Number.isFinite(strike) || strike <= 0) return null;
   return credit / strike;
+}
+
+function optionExpiry(row) {
+  return String(row?.expiry || row?.expiration || "").slice(0, 10);
+}
+
+function optionDte(row) {
+  const dte = Number(row?.dte);
+  return Number.isFinite(dte) ? dte : null;
+}
+
+function withinOneYear(row) {
+  const dte = optionDte(row);
+  return dte !== null && dte >= 0 && dte <= MAX_EXPIRY_DTE;
+}
+
+function expiryMatches(row, selectedExpiry) {
+  if (!withinOneYear(row)) return false;
+  if (selectedExpiry === "all") return true;
+  return optionExpiry(row) === selectedExpiry;
+}
+
+function formatExpiryLabel(expiry, dte) {
+  const parts = String(expiry || "").split("-");
+  const datePart = parts.length === 3 && parts[0] === String(new Date().getFullYear()) ? `${parts[1]}-${parts[2]}` : expiry;
+  const dteText = Number.isFinite(Number(dte)) ? Math.round(Number(dte)) : "--";
+  return `${datePart} ${dteText}天`;
+}
+
+function expiryOptions() {
+  const activeSet = new Set(scanTickers());
+  const byExpiry = new Map();
+  for (const item of payload?.expiries || []) {
+    const expiry = String(item.expiry || "").slice(0, 10);
+    const dte = Number(item.dte);
+    if (expiry && Number.isFinite(dte) && dte >= 0 && dte <= MAX_EXPIRY_DTE) {
+      byExpiry.set(expiry, Math.min(dte, byExpiry.get(expiry) ?? dte));
+    }
+  }
+  for (const row of payload?.underlyings || []) {
+    if (!activeSet.has(String(row.ticker || "").toUpperCase())) continue;
+    for (const option of [...(row.topOptions || []), row]) {
+      const expiry = optionExpiry(option);
+      const dte = optionDte(option);
+      if (expiry && dte !== null && dte >= 0 && dte <= MAX_EXPIRY_DTE) {
+        byExpiry.set(expiry, Math.min(dte, byExpiry.get(expiry) ?? dte));
+      }
+    }
+  }
+  return [...byExpiry.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([expiry, dte]) => ({ value: expiry, label: formatExpiryLabel(expiry, dte) }));
+}
+
+function renderExpiryFilter() {
+  if (!els.dteFilter) return;
+  const options = expiryOptions();
+  if (expiryFilter !== "all" && !options.some((item) => item.value === expiryFilter)) {
+    expiryFilter = "all";
+  }
+  els.dteFilter.innerHTML = [
+    `<option value="all">全部</option>`,
+    ...options.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`)
+  ].join("");
+  els.dteFilter.value = expiryFilter;
 }
 
 function detailLine(label, value, tone = "") {
@@ -565,19 +631,6 @@ function compareBySort(a, b, config = activeOptionSort()) {
   return av > bv ? direction : -direction;
 }
 
-function dteMatches(row, mode) {
-  const dte = Number(row?.dte);
-  if (!Number.isFinite(dte)) return mode === "all";
-  if (mode === "all") return true;
-  if (mode === "short") return dte >= 7 && dte <= 30;
-  if (mode === "monthly") return dte >= 31 && dte <= 75;
-  if (mode === "coreMonthly") return dte >= 31 && dte <= 45;
-  if (mode === "longerMonthly") return dte >= 46 && dte <= 75;
-  if (mode === "quarterly") return dte >= 76 && dte <= 120;
-  if (mode === "longTerm") return dte >= 121 && dte <= 365;
-  return true;
-}
-
 function optionRowsForUnderlying(row, limit = 10) {
   if (!row) return [];
   const seen = new Set();
@@ -587,13 +640,13 @@ function optionRowsForUnderlying(row, limit = 10) {
     seen.add(key);
     return true;
   });
-  let options = source.filter((option) => dteMatches(option, dteFilter));
+  let options = source.filter((option) => expiryMatches(option, expiryFilter));
   if (filterMode === "valid") options = options.filter((option) => option.platform_valid !== false);
   options = [...options].sort((a, b) => compareBySort(a, b));
   return Number.isFinite(limit) ? options.slice(0, limit) : options;
 }
 
-function rowForDteFilter(row) {
+function rowForExpiryFilter(row) {
   const match = optionRowsForUnderlying(row, 1)[0];
   if (!match) return null;
   return { ...row, ...match, topOptions: row.topOptions || [] };
@@ -603,7 +656,7 @@ function visibleRows() {
   const activeSet = new Set(scanTickers());
   let rows = (payload?.underlyings || [])
     .filter((row) => activeSet.has(String(row.ticker || "").toUpperCase()))
-    .map(rowForDteFilter)
+    .map(rowForExpiryFilter)
     .filter(Boolean);
   if (filterMode === "valid") rows = rows.filter((row) => row.platform_valid !== false);
   const query = tableQuery.trim().toUpperCase();
@@ -892,6 +945,7 @@ function render() {
   renderWatchlists();
   renderKpis();
   renderProgress();
+  renderExpiryFilter();
   renderTable();
   renderDetail();
 }
@@ -1046,7 +1100,7 @@ els.validFilter.addEventListener("change", (event) => {
   renderTable();
 });
 els.dteFilter?.addEventListener("change", (event) => {
-  dteFilter = event.target.value;
+  expiryFilter = event.target.value;
   selectedOptionTicker = "";
   expandedOptionKey = "";
   renderTable();
