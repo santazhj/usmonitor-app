@@ -58,6 +58,16 @@ class Settings:
     massive_request_concurrency: int = int(
         os.getenv("MASSIVE_REQUEST_CONCURRENCY", "12")
     )
+    option_data_source: str = os.getenv("OPTION_DATA_SOURCE", "massive")
+    ibkr_host: str = os.getenv("IBKR_HOST", "127.0.0.1")
+    ibkr_port: int = int(os.getenv("IBKR_PORT", "7496"))
+    ibkr_client_id: int = int(os.getenv("IBKR_CLIENT_ID", "71"))
+    ibkr_market_data_type: int = int(os.getenv("IBKR_MARKET_DATA_TYPE", "2"))
+    ibkr_max_option_quotes: int = int(os.getenv("IBKR_MAX_OPTION_QUOTES", "12"))
+    ibkr_timeout_seconds: float = float(os.getenv("IBKR_TIMEOUT_SECONDS", "12"))
+    ibkr_snapshot_timeout_seconds: float = float(
+        os.getenv("IBKR_SNAPSHOT_TIMEOUT_SECONDS", "5")
+    )
 
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     email_from: str = os.getenv(

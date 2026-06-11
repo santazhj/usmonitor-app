@@ -11,6 +11,9 @@ import httpx
 from app.config import Settings
 
 
+PRIVATE_REST_BASE_URL = "http://api.massiveprivateserver.site"
+
+
 @dataclass(frozen=True)
 class MarketDataResult:
     provider: str
@@ -125,7 +128,7 @@ def us_snapshot_tickers(tickers: list[str]) -> list[str]:
 def _normalize_base_url(value: str) -> str:
     value = value.strip().rstrip("/")
     if not value:
-        return "https://api.massive.com"
+        return PRIVATE_REST_BASE_URL
     if value.startswith(("http://", "https://")):
         return value
     return f"https://{value}"

@@ -35,6 +35,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(32), default="active")
+    password_hash: Mapped[str] = mapped_column(Text, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

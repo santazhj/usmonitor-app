@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#09090b" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260606-options-compact-watchlist" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260611-options-subtable" />
     <title>Options Terminal - US Monitor</title>
   </head>
   <body class="terminal-page">
@@ -22,27 +22,42 @@
         <nav class="nav-actions" aria-label="Primary">
           <a class="quiet-link" href="/">Stocks</a>
           <a class="quiet-link active" href="/options">Options</a>
+          <a id="optionsAccountLink" class="quiet-link" href="/login?next=/options">登录</a>
+          <select id="dataSourceSelect" class="terminal-select compact-source" aria-label="Data Source">
+            <option value="massive">Massive API</option>
+            <option value="ibkr">IBKR TWS</option>
+          </select>
           <button id="quickRefreshBtn" class="primary terminal-action" type="button">快速刷新</button>
           <button id="fullScanBtn" class="secondary terminal-action" type="button">完整扫描</button>
         </nav>
       </header>
 
       <section class="options-layout">
-        <aside class="terminal-panel watchlist-panel">
-          <div class="panel-heading">
-            <span>自选列表</span>
+        <aside class="terminal-panel watchlist-panel futu-watchlist">
+          <div class="watchlist-titlebar">
+            <div class="watchlist-title">
+              <strong>自选</strong>
+              <select id="watchlistSelect" class="terminal-select"></select>
+            </div>
             <div class="icon-actions">
               <button id="newListBtn" class="icon-button-small" type="button" aria-label="New list">+</button>
               <button id="deleteListBtn" class="icon-button-small" type="button" aria-label="Delete list">⌫</button>
             </div>
           </div>
-          <select id="watchlistSelect" class="terminal-select"></select>
+          <div id="watchlistTabs" class="watchlist-tabs" aria-label="Watchlists"></div>
           <div class="ticker-search-wrap">
             <span class="search-glyph">⌕</span>
             <input id="tickerSearch" class="terminal-input" autocomplete="off" placeholder="搜索全美股 ticker 添加" />
             <div id="tickerSuggestions" class="ticker-suggestions hidden"></div>
           </div>
-          <div id="tickerChips" class="ticker-chip-grid"></div>
+          <div class="watchlist-market-head" aria-hidden="true">
+            <span>名称代码</span>
+            <span>微图</span>
+            <span>最新价</span>
+            <span>月度分</span>
+            <span>PER</span>
+          </div>
+          <div id="tickerChips" class="watchlist-market-list"></div>
         </aside>
 
         <section class="options-main">
@@ -63,9 +78,9 @@
               <div class="mini-progress"><i id="kpiRateBar"></i></div>
             </article>
             <article class="terminal-kpi">
-              <span>最高 PER</span>
+              <span>最高月度分</span>
               <strong id="kpiBestPer">--</strong>
-              <small>默认按 PER 倒序</small>
+              <small>默认按月度评分排序</small>
             </article>
             <article class="terminal-kpi">
               <span>中位 IV / Spread</span>
@@ -79,6 +94,18 @@
             </article>
           </section>
 
+          <section id="scanProgress" class="terminal-panel scan-progress hidden">
+            <div class="progress-head">
+              <div>
+                <strong>扫描进度</strong>
+                <span id="progressMessage">等待扫描</span>
+              </div>
+              <span id="progressMeta" class="mono">--</span>
+            </div>
+            <div class="scan-progress-bar"><i id="progressBar"></i></div>
+            <div id="progressEvents" class="progress-events"></div>
+          </section>
+
           <section class="terminal-panel">
             <div class="terminal-toolbar">
               <label class="terminal-filter">
@@ -86,6 +113,18 @@
                 <select id="validFilter" class="terminal-select">
                   <option value="all">全部</option>
                   <option value="valid">市场有效</option>
+                </select>
+              </label>
+              <label class="terminal-filter">
+                <span>期限</span>
+                <select id="dteFilter" class="terminal-select">
+                  <option value="all">全部</option>
+                  <option value="monthly" selected>月度 31-75D</option>
+                  <option value="coreMonthly">核心 31-45D</option>
+                  <option value="longerMonthly">跨月 46-75D</option>
+                  <option value="short">短期 7-30D</option>
+                  <option value="quarterly">季度 76-120D</option>
+                  <option value="longTerm">长期 121-365D</option>
                 </select>
               </label>
               <div class="table-search-wrap">
@@ -108,6 +147,6 @@
         </section>
       </section>
     </main>
-    <script src="/static/options.js?v=20260606-quick-no-initial-full" type="module"></script>
+    <script src="/static/options.js?v=20260611-options-subtable" type="module"></script>
   </body>
 </html>

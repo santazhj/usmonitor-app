@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f5f7fa" />
+    <meta name="theme-color" content="#09090b" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260606-options-compact-watchlist" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260610-product3d" />
     <title>US Monitor</title>
   </head>
-  <body>
+  <body class="market-page">
     <main class="shell">
       <header class="topbar">
         <div class="brand-cluster">
@@ -25,7 +25,7 @@
           <a class="quiet-link" href="#dashboard" data-i18n="nav.dashboard">看板</a>
           <a class="quiet-link" href="/options">Options</a>
           <a class="quiet-link" href="#alerts" data-i18n="nav.alerts">情报</a>
-          <a class="quiet-link" href="#account" data-i18n="nav.account">账户</a>
+          <a class="quiet-link" href="/login" data-i18n="nav.account">账户</a>
           <a id="adminLink" class="quiet-link hidden" href="/admin">Admin</a>
           <button id="languageToggle" class="text-button lang-toggle" type="button">
             EN
@@ -38,17 +38,23 @@
 
       <section id="dashboard" class="dashboard-shell">
         <section class="dashboard-main">
-          <div class="dashboard-heading">
-            <div>
+          <div class="dashboard-heading market-hero">
+            <div class="hero-copy">
               <p class="eyebrow" data-i18n="hero.eyebrow">AI 基础设施</p>
               <h1 data-i18n="hero.title">美股 AI 产业链终端</h1>
               <p class="lede" data-i18n="hero.lede">
                 按算力、半导体、光互连、电力和软件分层跟踪核心标的，聚焦价格、流动性和产业链瓶颈。
               </p>
+              <div class="hero-pills" aria-label="Dashboard coverage">
+                <span data-i18n="hero.pill.watchlist">Watchlist matrix</span>
+                <span data-i18n="hero.pill.sources">Live source checks</span>
+                <span data-i18n="hero.pill.alerts">Curated alert feed</span>
+              </div>
             </div>
-            <div class="refresh-card">
+            <div class="refresh-card market-status-card">
               <span id="refreshLabel">15s refresh target</span>
               <strong id="dataStatus">Loading</strong>
+              <div class="status-meter" aria-hidden="true"><i></i></div>
               <small id="lastUpdated">--</small>
             </div>
           </div>
@@ -72,6 +78,13 @@
           <div class="category-tabs" id="categoryTabs"></div>
 
           <section class="market-table-wrap" aria-label="AI stock watchlist">
+            <div class="market-table-title">
+              <div>
+                <p class="eyebrow" data-i18n="table.sectionEyebrow">Watchlist matrix</p>
+                <h2 data-i18n="table.sectionTitle">产业链标的矩阵</h2>
+              </div>
+              <span data-i18n="table.sectionMeta">点击行查看产业链定位</span>
+            </div>
             <div class="market-table-header">
               <button class="table-sort" data-sort="ticker" type="button" data-i18n="table.ticker">
                 代码
@@ -104,7 +117,7 @@
               <h2 data-i18n="rail.alertsTitle">最新情报</h2>
             </div>
             <div id="feedBox" class="feed-list compact-feed">
-              <p class="empty" data-i18n="alerts.signedOut">登录后查看完整 alert feed。</p>
+              <p class="empty" data-i18n="alerts.signedOut">正在加载公开情报 feed。</p>
             </div>
           </section>
 
@@ -120,70 +133,12 @@
             <p class="eyebrow" data-i18n="terms.eyebrow">定位</p>
             <h2 data-i18n="terms.title">情报摘要，不是交易建议</h2>
             <p data-i18n="terms.body">
-              邮箱可直接注册免费版。高级 alert 和推送权限需付款，或由后台手动开通会员。
+              当前市场数据和情报先公开展示；邮箱注册用于账户、推送、付款和后续 VIP 权限。
             </p>
           </section>
         </aside>
       </section>
 
-      <section id="account" class="account-grid">
-        <section id="authView" class="panel auth-panel hidden">
-          <div class="section-title">
-            <p class="eyebrow" data-i18n="auth.eyebrow">邮箱注册</p>
-            <h2 data-i18n="auth.title">邮箱注册 / 登录</h2>
-          </div>
-          <form id="loginForm" class="stack">
-            <label>
-              <span data-i18n="auth.email">邮箱</span>
-              <input name="email" type="email" autocomplete="email" required />
-            </label>
-            <button class="primary" type="submit" data-i18n="auth.submit">发送登录链接</button>
-          </form>
-          <p id="loginMessage" class="status-line"></p>
-        </section>
-
-        <section id="memberView" class="member-grid hidden">
-          <section class="panel account-panel">
-            <div>
-              <p class="eyebrow" data-i18n="account.eyebrow">账户</p>
-              <h2 id="accountEmail">-</h2>
-            </div>
-            <div id="subscriptionState" class="state-box"></div>
-          </section>
-
-          <section class="panel controls-panel">
-            <div>
-              <p class="eyebrow" data-i18n="push.eyebrow">推送</p>
-              <h2 data-i18n="push.title">iPhone PWA 推送</h2>
-            </div>
-            <div class="button-row">
-              <button id="enablePushBtn" class="primary" type="button" data-i18n="push.enable">
-                开启推送
-              </button>
-              <button id="testPushBtn" class="secondary" type="button" data-i18n="push.test">
-                测试推送
-              </button>
-            </div>
-            <p id="pushStatus" class="status-line"></p>
-          </section>
-
-          <section class="panel payment-panel">
-            <div>
-              <p class="eyebrow" data-i18n="payment.eyebrow">付款</p>
-              <h2 data-i18n="payment.title">99 USDT / 月</h2>
-            </div>
-            <div id="paymentBox" class="payment-box"></div>
-          </section>
-
-          <section class="panel lists-panel">
-            <div>
-              <p class="eyebrow" data-i18n="lists.eyebrow">列表</p>
-              <h2 data-i18n="lists.title">订阅列表</h2>
-            </div>
-            <div id="listBox" class="list-box"></div>
-          </section>
-        </section>
-      </section>
     </main>
 
     <aside id="tickerDrawer" class="ticker-drawer hidden" aria-hidden="true">
@@ -194,6 +149,6 @@
       </section>
     </aside>
 
-    <script src="/static/app.js?v=20260525-feed-state-fix" type="module"></script>
+    <script src="/static/app.js?v=20260610-product3d" type="module"></script>
   </body>
 </html>

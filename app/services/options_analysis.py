@@ -3,16 +3,22 @@ from __future__ import annotations
 import asyncio
 import copy
 import math
+import re
+import threading
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
 import httpx
 
 from app.config import Settings
+from app.services.ibkr_options import IbkrOptionsClient, IbkrOptionsError
+
+
+PRIVATE_REST_BASE_URL = "http://api.massiveprivateserver.site"
 
 
 DEFAULT_OPTION_TICKERS = [
@@ -24,32 +30,34 @@ DEFAULT_OPTION_TICKERS = [
     "GOOGL",
     "TSLA",
     "AVGO",
-    "AMD",
-    "NFLX",
     "ORCL",
-    "CRM",
-    "ADBE",
-    "QCOM",
+    "AMD",
     "INTC",
     "MU",
     "ARM",
     "PLTR",
-    "PANW",
-    "CRWD",
+    "MRVL",
+    "BE",
+    "TEM",
+    "AAOI",
+    "LEU",
+    "RKLB",
+    "MSTR",
     "TSM",
     "ASML",
     "AMAT",
     "LRCX",
-    "MRVL",
+    "KLAC",
     "SMCI",
-    "SNOW",
-    "SHOP",
-    "NOW",
-    "APP",
+    "LITE",
+    "COHR",
+    "ANET",
+    "VRT",
 ]
 
 MIN_DTE = 7
 MAX_DTE = 60
+MAX_SCAN_DTE = 365
 MIN_DELTA_ABS = 0.10
 MAX_DELTA_ABS = 0.35
 MAX_SPREAD_PCT = 0.12
@@ -58,6 +66,12 @@ CLOSED_MARKET_QUOTE_MAX_AGE_SECONDS = 84 * 60 * 60
 QUOTE_STALE_SECONDS = 20 * 60
 RISK_FREE_RATE = 0.045
 DIVIDEND_YIELD = 0.0
+DATA_SOURCES = {"massive", "ibkr"}
+API_KEY_QUERY_RE = re.compile(r"(apiKey=)[^&\s)'\"\]]+")
+
+
+def _effective_max_dte() -> int:
+    return min(MAX_DTE, MAX_SCAN_DTE)
 
 
 @dataclass
@@ -68,13 +82,117 @@ class OptionScanCacheEntry:
 
 _scan_cache: dict[tuple[str, ...], OptionScanCacheEntry] = {}
 _scan_cache_lock = asyncio.Lock()
+_scan_progress: dict[tuple[str, ...], dict[str, Any]] = {}
+_scan_progress_lock = threading.Lock()
 
 
 def _normalize_base_url(value: str) -> str:
-    base = (value or "https://api.massive.com").strip().rstrip("/")
+    base = (value or PRIVATE_REST_BASE_URL).strip().rstrip("/")
     if not base.startswith(("http://", "https://")):
         base = f"https://{base}"
     return base
+
+
+def _normalize_data_source(settings: Settings, value: str | None = None) -> str:
+    source = (value or settings.option_data_source or "massive").strip().lower()
+    if source not in DATA_SOURCES:
+        raise RuntimeError(f"Unsupported option data source: {source}. Choose massive or ibkr.")
+    return source
+
+
+def _cache_key(source: str, tickers: list[str]) -> tuple[str, ...]:
+    return (source, *tickers)
+
+
+def _start_progress(key: tuple[str, ...], source: str, tickers: list[str], mode: str) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with _scan_progress_lock:
+        _scan_progress[key] = {
+            "active": True,
+            "source": source,
+            "mode": mode,
+            "tickers": tickers,
+            "total": len(tickers),
+            "completed": 0,
+            "stage": "queued",
+            "currentTicker": None,
+            "message": f"Queued {len(tickers)} tickers",
+            "contracts": 0,
+            "quoteRequests": 0,
+            "quotesWithBidAsk": 0,
+            "quotesWithGreeks": 0,
+            "errors": [],
+            "events": [],
+            "startedAt": now,
+            "updatedAt": now,
+            "finishedAt": None,
+        }
+
+
+def _update_progress(key: tuple[str, ...], event: dict[str, Any]) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with _scan_progress_lock:
+        current = _scan_progress.setdefault(key, {"active": True, "events": [], "errors": [], "startedAt": now})
+        ticker = event.get("ticker")
+        stage = event.get("stage")
+        message = event.get("message")
+        if ticker:
+            current["currentTicker"] = ticker
+        if stage:
+            current["stage"] = stage
+        if message:
+            current["message"] = message
+        for field in ("total", "completed", "contracts", "quoteRequests", "quotesWithBidAsk", "quotesWithGreeks"):
+            if field in event:
+                current[field] = event[field]
+        if stage == "error" and message:
+            errors = list(current.get("errors") or [])
+            errors.append(message)
+            current["errors"] = errors[-8:]
+        events = list(current.get("events") or [])
+        if stage or message:
+            events.append({"time": now, "ticker": ticker, "stage": stage, "message": message})
+            current["events"] = events[-10:]
+        current["updatedAt"] = now
+
+
+def _finish_progress(key: tuple[str, ...], success: bool, message: str, contracts: int = 0) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with _scan_progress_lock:
+        current = _scan_progress.setdefault(key, {"events": [], "errors": [], "startedAt": now})
+        current["active"] = False
+        current["success"] = success
+        current["stage"] = "done" if success else "failed"
+        current["message"] = message
+        current["contracts"] = contracts
+        current["updatedAt"] = now
+        current["finishedAt"] = now
+
+
+def options_progress_snapshot(settings: Settings, raw_tickers: str | list[str] | None = None, source: str | None = None) -> dict[str, Any]:
+    tickers = normalize_tickers(raw_tickers)
+    normalized_source = _normalize_data_source(settings, source)
+    key = _cache_key(normalized_source, tickers)
+    with _scan_progress_lock:
+        progress = copy.deepcopy(_scan_progress.get(key))
+    if progress:
+        return progress
+    return {
+        "active": False,
+        "source": normalized_source,
+        "tickers": tickers,
+        "total": len(tickers),
+        "completed": 0,
+        "stage": "idle",
+        "currentTicker": None,
+        "message": "Idle",
+        "contracts": 0,
+        "quoteRequests": 0,
+        "quotesWithBidAsk": 0,
+        "quotesWithGreeks": 0,
+        "errors": [],
+        "events": [],
+    }
 
 
 def _current_us_market_date(now: datetime | None = None) -> date:
@@ -94,6 +212,10 @@ def _with_api_key(url: str, api_key: str, base_url: str) -> str:
     query = parse_qs(parsed.query)
     query.setdefault("apiKey", [api_key])
     return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+
+
+def _redact_api_key(value: Any) -> str:
+    return API_KEY_QUERY_RE.sub(r"\1<redacted>", str(value))
 
 
 async def _get_json(
@@ -138,10 +260,10 @@ async def _get_json(
                 raise RuntimeError(f"Massive status={payload.get('status')}: {payload}")
             return payload
         except Exception as exc:  # noqa: BLE001
-            last_error = exc
+            last_error = RuntimeError(_redact_api_key(exc))
             if attempt < 2:
                 await asyncio.sleep(1.5 * (attempt + 1))
-    raise RuntimeError(f"Massive request failed: {last_error}")
+    raise RuntimeError(f"Massive request failed: {_redact_api_key(last_error)}")
 
 
 async def _paged_results(
@@ -210,6 +332,48 @@ def _annualized_yield(credit: float, strike: float, dte: int) -> float:
     return credit / strike * 365 / dte
 
 
+def _cycle_put_edge_ratio(expiry_yield: float, delta_abs: float | None, buffer_em_ratio: float | None) -> float:
+    if expiry_yield <= 0 or delta_abs is None or delta_abs <= 0:
+        return 0.0
+    if buffer_em_ratio is None or buffer_em_ratio <= 0:
+        return 0.0
+    return max(0.0, expiry_yield / delta_abs * min(buffer_em_ratio, 2.0))
+
+
+def _dte_bucket(dte: int) -> str:
+    if dte <= 14:
+        return "07-14D"
+    if dte <= 30:
+        return "15-30D"
+    if dte <= 45:
+        return "31-45D"
+    if dte <= 75:
+        return "46-75D"
+    if dte <= 120:
+        return "76-120D"
+    return "121-365D"
+
+
+def _dte_bucket_preference(bucket: str) -> float:
+    return {
+        "07-14D": 0.25,
+        "15-30D": 0.65,
+        "31-45D": 1.00,
+        "46-75D": 0.92,
+        "76-120D": 0.62,
+        "121-365D": 0.42,
+    }.get(bucket, 0.50)
+
+
+def _monthly_score(record: dict[str, Any]) -> float:
+    if not record.get("platform_valid", True):
+        return 0.0
+    bucket_rank = _to_float(record.get("bucket_rank") or record.get("put_edge_rank"), 0.0) or 0.0
+    quality = max(0.0, min(1.0, (_to_float(record.get("score"), 0.0) or 0.0) / 100.0))
+    bucket_preference = _dte_bucket_preference(str(record.get("dte_bucket") or ""))
+    return round(100.0 * (0.55 * bucket_rank + 0.25 * quality + 0.20 * bucket_preference), 2)
+
+
 def _expected_move(spot: float, iv: float | None, dte: int) -> float | None:
     if not iv or iv <= 0 or spot <= 0 or dte <= 0:
         return None
@@ -256,18 +420,18 @@ def _black_scholes_put_price(
     ) * _normal_cdf(-d1)
 
 
-def _edge_flag(flags: list[str], ratio: float) -> str:
+def _edge_flag(flags: list[str], cycle_ratio: float, bucket_rank: float = 0.0, monthly_score: float = 0.0) -> str:
     if "stale_quote" in flags:
         return "Stale"
     if "invalid_quote" in flags or "missing_delta" in flags or "missing_iv" in flags:
         return "Data Gap"
     if "wide_spread" in flags or "low_open_interest" in flags:
         return "Liquidity"
-    if ratio >= 1.0:
+    if monthly_score >= 80 or (cycle_ratio >= 0.12 and bucket_rank >= 0.95):
         return "Extreme"
-    if ratio >= 0.65:
+    if monthly_score >= 68 or (cycle_ratio >= 0.08 and bucket_rank >= 0.85):
         return "Good"
-    if ratio >= 0.35:
+    if monthly_score >= 55 or cycle_ratio >= 0.05:
         return "Watch"
     return "Normal"
 
@@ -336,6 +500,10 @@ def _option_record(
     target_credit = bid + max(0.0, ask - bid) * 0.25 if bid > 0 and ask > bid else bid
     spread_pct = (ask - bid) / mid if mid > 0 else 1.0
     delta = _to_float(_pick(greeks, ("delta",)))
+    gamma = _to_float(_pick(greeks, ("gamma",)))
+    vega = _to_float(_pick(greeks, ("vega",)))
+    theta = _to_float(_pick(greeks, ("theta",)))
+    rho = _to_float(_pick(greeks, ("rho",)))
     iv = _to_float(raw.get("implied_volatility"))
     open_interest = _to_int(raw.get("open_interest"), 0)
     shares_per_contract = _to_int(_pick(details, ("shares_per_contract",), 100), 100)
@@ -360,11 +528,12 @@ def _option_record(
     liquidity = _liquidity_factor(spread_pct, open_interest)
     freshness = _freshness_factor(quote_age_seconds, closed_reference)
     delta_abs = abs(delta) if delta is not None else None
+    expiry_yield = target_credit / strike if strike > 0 else None
+    cycle_edge = _cycle_put_edge_ratio(expiry_yield or 0.0, delta_abs, buffer_em_ratio)
     put_edge_ratio = (
         ann_yield_bid
         / max(delta_abs or 0, 0.01)
-        * max(buffer_em_ratio or 0, 0)
-        * liquidity
+        * min(max(buffer_em_ratio or 0, 0), 2.0)
     )
     bs_price = _black_scholes_put_price(spot, strike, dte, iv)
     premium_vs_bs = target_credit / bs_price - 1 if bs_price and bs_price > 0 else None
@@ -374,7 +543,7 @@ def _option_record(
         flags.append("not_put")
     if shares_per_contract != 100:
         flags.append("non_standard_contract")
-    if not (MIN_DTE <= dte <= MAX_DTE):
+    if not (MIN_DTE <= dte <= _effective_max_dte()):
         flags.append("dte_out_of_range")
     if strike >= spot:
         flags.append("not_otm")
@@ -415,9 +584,14 @@ def _option_record(
         "bid_size": bid_size,
         "ask_size": ask_size,
         "target_credit": target_credit,
+        "expiry_yield": expiry_yield,
         "ann_yield_bid": ann_yield_bid,
         "ann_yield_mid": ann_yield_mid,
         "delta": delta,
+        "gamma": gamma,
+        "vega": vega,
+        "theta": theta,
+        "rho": rho,
         "iv": iv,
         "open_interest": open_interest,
         "spread_pct": spread_pct,
@@ -426,13 +600,15 @@ def _option_record(
         "expected_move": expected_move,
         "buffer_em_ratio": buffer_em_ratio,
         "put_edge_ratio": put_edge_ratio,
+        "cycle_put_edge_ratio": cycle_edge,
+        "dte_bucket": _dte_bucket(dte),
         "bs_put_price": bs_price,
         "premium_vs_bs_pct": premium_vs_bs,
         "quote_time": quote_time.isoformat() if quote_time else None,
         "quote_age_seconds": quote_age_seconds,
         "quote_mode": quote_mode,
         "platform_valid": _market_valid(flags),
-        "edge_flag": _edge_flag(flags, put_edge_ratio),
+        "edge_flag": _edge_flag(flags, cycle_edge),
         "score": min(100.0, max(0.0, put_edge_ratio * 35 + breakeven_buffer * 220 + liquidity * 20)),
         "risk_flags": ", ".join(flags),
         **_stress(spot, strike, target_credit, expected_move),
@@ -449,9 +625,38 @@ def _median(values: list[Any]) -> float | None:
     return (numeric[mid - 1] + numeric[mid]) / 2
 
 
+def _add_bucket_rankings(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_bucket: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        record["dte_bucket"] = record.get("dte_bucket") or _dte_bucket(_to_int(record.get("dte"), 0))
+        by_bucket.setdefault(str(record["dte_bucket"]), []).append(record)
+
+    for bucket_records in by_bucket.values():
+        rankable = [item for item in bucket_records if item.get("platform_valid")]
+        for record in bucket_records:
+            record["bucket_rank"] = 0.0
+            record["put_edge_rank"] = 0.0
+            record["monthly_score"] = 0.0
+        values = sorted(_to_float(item.get("cycle_put_edge_ratio"), 0.0) or 0.0 for item in rankable)
+        total = len(values)
+        if total <= 0:
+            for record in bucket_records:
+                flags = str(record.get("risk_flags") or "").split(", ")
+                record["edge_flag"] = _edge_flag(flags, _to_float(record.get("cycle_put_edge_ratio"), 0.0) or 0.0)
+            continue
+        for record in rankable:
+            value = _to_float(record.get("cycle_put_edge_ratio"), 0.0) or 0.0
+            rank = sum(1 for item in values if item <= value) / total
+            record["bucket_rank"] = rank
+            record["put_edge_rank"] = rank
+            record["monthly_score"] = _monthly_score(record)
+            flags = str(record.get("risk_flags") or "").split(", ")
+            record["edge_flag"] = _edge_flag(flags, value, rank, record["monthly_score"])
+    return records
+
+
 def _summarize(records: list[dict[str, Any]], underlyings: list[dict[str, Any]]) -> dict[str, Any]:
     valid = [item for item in records if item.get("platform_valid")]
-    source = valid or records
     now = datetime.now(timezone.utc).isoformat()
     return {
         "underlyings": len(underlyings),
@@ -459,10 +664,12 @@ def _summarize(records: list[dict[str, Any]], underlyings: list[dict[str, Any]])
         "validContracts": len(valid),
         "analyzableContractRate": len(valid) / len(records) if records else 0,
         "validQuoteRate": len(valid) / len(records) if records else 0,
-        "bestPer": max((_to_float(item.get("put_edge_ratio"), 0.0) or 0.0 for item in source), default=None),
-        "medianIv": _median([item.get("iv") for item in source]),
-        "medianSpread": _median([item.get("spread_pct") for item in source]),
-        "medianBuffer": _median([item.get("breakeven_buffer") for item in source]),
+        "bestPer": max((_to_float(item.get("put_edge_ratio"), 0.0) or 0.0 for item in valid), default=None),
+        "bestCyclePer": max((_to_float(item.get("cycle_put_edge_ratio"), 0.0) or 0.0 for item in valid), default=None),
+        "bestMonthlyScore": max((_to_float(item.get("monthly_score"), 0.0) or 0.0 for item in valid), default=None),
+        "medianIv": _median([item.get("iv") for item in valid]),
+        "medianSpread": _median([item.get("spread_pct") for item in valid]),
+        "medianBuffer": _median([item.get("breakeven_buffer") for item in valid]),
         "lastRefresh": now,
         "fullScanAt": now,
         "refreshMode": "full",
@@ -476,9 +683,11 @@ def _top_options(records: list[dict[str, Any]], limit: int = 10) -> list[dict[st
     return sorted(
         selected,
         key=lambda item: (
-            _to_float(item.get("put_edge_ratio"), 0.0) or 0.0,
+            _to_float(item.get("monthly_score"), 0.0) or 0.0,
+            _to_float(item.get("bucket_rank"), 0.0) or 0.0,
+            _to_float(item.get("cycle_put_edge_ratio"), 0.0) or 0.0,
             _to_float(item.get("score"), 0.0) or 0.0,
-            _to_float(item.get("ann_yield_bid"), 0.0) or 0.0,
+            _to_float(item.get("put_edge_ratio"), 0.0) or 0.0,
         ),
         reverse=True,
     )[:limit]
@@ -488,7 +697,9 @@ def _payload_from_records(
     tickers: list[str],
     records: list[dict[str, Any]],
     errors: list[str],
+    source: str = "massive",
 ) -> dict[str, Any]:
+    records = _add_bucket_rankings(records)
     underlyings: list[dict[str, Any]] = []
     by_ticker: dict[str, list[dict[str, Any]]] = {}
     for record in records:
@@ -508,13 +719,15 @@ def _payload_from_records(
 
     underlyings.sort(
         key=lambda item: (
-            _to_float(item.get("put_edge_ratio"), 0.0) or 0.0,
+            _to_float(item.get("monthly_score"), 0.0) or 0.0,
+            _to_float(item.get("bucket_rank"), 0.0) or 0.0,
+            _to_float(item.get("cycle_put_edge_ratio"), 0.0) or 0.0,
             _to_float(item.get("score"), 0.0) or 0.0,
         ),
         reverse=True,
     )
     return {
-        "summary": _summarize(records, underlyings),
+        "summary": {**_summarize(records, underlyings), "dataSource": source},
         "underlyings": underlyings,
         "errors": errors,
         "tickers": tickers,
@@ -530,12 +743,17 @@ def normalize_tickers(raw_tickers: str | list[str] | None) -> list[str]:
     return list(dict.fromkeys(tickers))
 
 
-async def build_full_payload(settings: Settings, tickers: list[str]) -> dict[str, Any]:
+async def build_massive_full_payload(
+    settings: Settings,
+    tickers: list[str],
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     today = _current_us_market_date()
+    max_dte = _effective_max_dte()
     params = {
         "contract_type": "put",
         "expiration_date.gte": date.fromordinal(today.toordinal() + MIN_DTE).isoformat(),
-        "expiration_date.lte": date.fromordinal(today.toordinal() + MAX_DTE).isoformat(),
+        "expiration_date.lte": date.fromordinal(today.toordinal() + max_dte).isoformat(),
         "limit": 250,
         "sort": "expiration_date",
         "order": "asc",
@@ -543,10 +761,15 @@ async def build_full_payload(settings: Settings, tickers: list[str]) -> dict[str
     errors: list[str] = []
     records: list[dict[str, Any]] = []
     semaphore = asyncio.Semaphore(max(1, min(settings.massive_request_concurrency, 6)))
+    completed = 0
+    completed_lock = asyncio.Lock()
+    progress = progress_callback or (lambda event: None)
 
     async with httpx.AsyncClient() as client:
         async def scan_ticker(ticker: str) -> None:
+            nonlocal completed
             async with semaphore:
+                progress({"stage": "option_chain", "ticker": ticker, "message": f"{ticker}: loading Massive option chain", "total": len(tickers), "completed": completed})
                 try:
                     raw_chain = await _paged_results(
                         client,
@@ -555,17 +778,27 @@ async def build_full_payload(settings: Settings, tickers: list[str]) -> dict[str
                         params,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    errors.append(f"{ticker}: {exc}")
+                    error = f"{ticker}: {_redact_api_key(exc)}"
+                    errors.append(error)
+                    async with completed_lock:
+                        completed += 1
+                        progress({"stage": "error", "ticker": ticker, "message": error, "total": len(tickers), "completed": completed, "contracts": len(records)})
                     return
+                ticker_records = []
                 for raw in raw_chain:
                     record = _option_record(raw, underlying_ticker=ticker)
                     if record:
-                        records.append(record)
+                        ticker_records.append(record)
+                records.extend(ticker_records)
+                async with completed_lock:
+                    completed += 1
+                    progress({"stage": "ticker_done", "ticker": ticker, "message": f"{ticker}: {len(ticker_records)} contracts", "total": len(tickers), "completed": completed, "contracts": len(records)})
 
         await asyncio.gather(*(scan_ticker(ticker) for ticker in tickers))
 
-    payload = _payload_from_records(tickers, records, errors)
-    key = tuple(tickers)
+    progress({"stage": "done", "message": "Scan complete" if not errors else f"Scan complete with {len(errors)} errors", "total": len(tickers), "completed": len(tickers), "contracts": len(records)})
+    payload = _payload_from_records(tickers, records, errors, source="massive")
+    key = _cache_key("massive", tickers)
     async with _scan_cache_lock:
         _scan_cache[key] = OptionScanCacheEntry(
             payload=copy.deepcopy(payload),
@@ -574,16 +807,102 @@ async def build_full_payload(settings: Settings, tickers: list[str]) -> dict[str
     return payload
 
 
-def _quick_no_cache_payload(tickers: list[str]) -> dict[str, Any]:
+def _build_ibkr_full_payload_sync(
+    settings: Settings,
+    tickers: list[str],
+    progress_callback: Callable[[dict[str, Any]], None],
+) -> dict[str, Any]:
+    today = _current_us_market_date()
+    min_expiry = date.fromordinal(today.toordinal() + MIN_DTE).isoformat()
+    max_expiry = date.fromordinal(today.toordinal() + _effective_max_dte()).isoformat()
+    records: list[dict[str, Any]] = []
+    errors: list[str] = []
+    client = IbkrOptionsClient(
+        host=settings.ibkr_host,
+        port=settings.ibkr_port,
+        client_id=settings.ibkr_client_id,
+        timeout_seconds=settings.ibkr_timeout_seconds,
+        market_data_type=settings.ibkr_market_data_type,
+        max_option_quotes=settings.ibkr_max_option_quotes,
+        snapshot_timeout_seconds=settings.ibkr_snapshot_timeout_seconds,
+        progress_callback=progress_callback,
+    )
+    try:
+        progress_callback({"stage": "start", "message": f"Scanning {len(tickers)} tickers", "total": len(tickers), "completed": 0})
+        for idx, ticker in enumerate(tickers, start=1):
+            progress_callback({"stage": "option_chain", "ticker": ticker, "message": f"{ticker}: loading option chain", "total": len(tickers), "completed": idx - 1})
+            try:
+                raw_chain = client.get_option_chain(ticker, expiration_date_gte=min_expiry, expiration_date_lte=max_expiry)
+            except IbkrOptionsError as exc:
+                error = f"{ticker} option chain: {exc}"
+                errors.append(error)
+                progress_callback({"stage": "error", "ticker": ticker, "message": error, "total": len(tickers), "completed": idx})
+                continue
+            progress_callback({"stage": "scoring", "ticker": ticker, "message": f"{ticker}: scoring {len(raw_chain)} contracts", "contracts": len(raw_chain), "total": len(tickers), "completed": idx - 1})
+            for raw in raw_chain:
+                record = _option_record(raw, underlying_ticker=ticker)
+                if record:
+                    records.append(record)
+            progress_callback({"stage": "ticker_done", "ticker": ticker, "message": f"{ticker}: done", "contracts": len(raw_chain), "total": len(tickers), "completed": idx})
+        progress_callback({"stage": "done", "message": "Scan complete", "total": len(tickers), "completed": len(tickers), "contracts": len(records)})
+        return _payload_from_records(tickers, records, errors, source="ibkr")
+    finally:
+        client.disconnect()
+
+
+async def build_ibkr_full_payload(
+    settings: Settings,
+    tickers: list[str],
+    progress_callback: Callable[[dict[str, Any]], None],
+) -> dict[str, Any]:
+    payload = await asyncio.to_thread(_build_ibkr_full_payload_sync, settings, tickers, progress_callback)
+    key = _cache_key("ibkr", tickers)
+    async with _scan_cache_lock:
+        _scan_cache[key] = OptionScanCacheEntry(
+            payload=copy.deepcopy(payload),
+            full_scanned_at=datetime.now(timezone.utc),
+        )
+    return payload
+
+
+async def build_full_payload(settings: Settings, tickers: list[str], source: str = "massive") -> dict[str, Any]:
+    normalized_source = _normalize_data_source(settings, source)
+    key = _cache_key(normalized_source, tickers)
+    _start_progress(key, normalized_source, tickers, mode="full")
+    progress_callback = lambda event: _update_progress(key, event)
+    try:
+        payload = (
+            await build_ibkr_full_payload(settings, tickers, progress_callback)
+            if normalized_source == "ibkr"
+            else await build_massive_full_payload(settings, tickers, progress_callback)
+        )
+        contracts = int(payload.get("summary", {}).get("contracts") or 0)
+        errors = list(payload.get("errors") or [])
+        success = not (errors and contracts == 0)
+        message = "Scan complete" if not errors else f"Scan complete with {len(errors)} errors"
+        if not success:
+            message = errors[0] if len(errors) == 1 else f"Scan failed for {len(errors)} tickers"
+        _finish_progress(key, success=success, message=message, contracts=contracts)
+        return payload
+    except Exception as exc:  # noqa: BLE001
+        _update_progress(key, {"stage": "error", "message": str(exc)})
+        _finish_progress(key, success=False, message=str(exc))
+        raise
+
+
+def _quick_no_cache_payload(tickers: list[str], source: str = "massive") -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
     return {
         "summary": {
+            "dataSource": source,
             "underlyings": len(tickers),
             "contracts": 0,
             "validContracts": 0,
             "analyzableContractRate": 0.0,
             "validQuoteRate": 0.0,
             "bestPer": None,
+            "bestCyclePer": None,
+            "bestMonthlyScore": None,
             "medianIv": None,
             "medianSpread": None,
             "medianBuffer": None,
@@ -611,6 +930,14 @@ async def _refresh_best_option(
     refreshed = _option_record(raw.get("results") or raw, underlying_ticker=ticker)
     if not refreshed:
         return row
+    refreshed["bucket_rank"] = row.get("bucket_rank")
+    refreshed["put_edge_rank"] = row.get("put_edge_rank")
+    refreshed["monthly_score"] = row.get("monthly_score")
+    refreshed["dte_bucket"] = row.get("dte_bucket") or refreshed.get("dte_bucket")
+    if not refreshed.get("platform_valid"):
+        refreshed["bucket_rank"] = 0.0
+        refreshed["put_edge_rank"] = 0.0
+        refreshed["monthly_score"] = 0.0
     refreshed["contractsScanned"] = row.get("contractsScanned")
     refreshed["validContracts"] = row.get("validContracts")
     top_options = list(row.get("topOptions") or [])
@@ -627,19 +954,34 @@ async def _refresh_best_option(
 async def build_quick_payload(
     settings: Settings,
     tickers: list[str],
+    source: str = "massive",
     allow_initial_full: bool = False,
 ) -> dict[str, Any]:
-    key = tuple(tickers)
+    normalized_source = _normalize_data_source(settings, source)
+    key = _cache_key(normalized_source, tickers)
     async with _scan_cache_lock:
         entry = _scan_cache.get(key)
         cached = copy.deepcopy(entry.payload) if entry else None
         full_scanned_at = entry.full_scanned_at if entry else None
     if cached is None and allow_initial_full:
-        payload = await build_full_payload(settings, tickers)
+        payload = await build_full_payload(settings, tickers, source=normalized_source)
         payload["summary"]["refreshMode"] = "full_initial"
         return payload
     if cached is None:
-        return _quick_no_cache_payload(tickers)
+        return _quick_no_cache_payload(tickers, source=normalized_source)
+
+    if normalized_source == "ibkr":
+        now = datetime.now(timezone.utc)
+        summary = dict(cached.get("summary") or {})
+        summary["dataSource"] = normalized_source
+        summary["lastRefresh"] = now.isoformat()
+        summary["quickRefreshAt"] = now.isoformat()
+        summary["fullScanAt"] = full_scanned_at.isoformat() if full_scanned_at else summary.get("fullScanAt")
+        summary["fullScanAgeSeconds"] = int((now - full_scanned_at).total_seconds()) if full_scanned_at else None
+        summary["quickContractsRefreshed"] = 0
+        summary["refreshMode"] = "quick_cached"
+        cached["summary"] = summary
+        return cached
 
     errors = list(cached.get("errors") or [])
     refreshed_count = 0
@@ -668,8 +1010,10 @@ async def build_quick_payload(
     summary["fullScanAgeSeconds"] = int((now - full_scanned_at).total_seconds()) if full_scanned_at else None
     summary["quickContractsRefreshed"] = refreshed_count
     summary["refreshMode"] = "quick"
-    source_rows = [row for row in cached["underlyings"] if row.get("platform_valid")] or cached["underlyings"]
+    source_rows = [row for row in cached["underlyings"] if row.get("platform_valid")]
     summary["bestPer"] = max((_to_float(row.get("put_edge_ratio"), 0.0) or 0.0 for row in source_rows), default=None)
+    summary["bestCyclePer"] = max((_to_float(row.get("cycle_put_edge_ratio"), 0.0) or 0.0 for row in source_rows), default=None)
+    summary["bestMonthlyScore"] = max((_to_float(row.get("monthly_score"), 0.0) or 0.0 for row in source_rows), default=None)
     summary["medianIv"] = _median([row.get("iv") for row in source_rows])
     summary["medianSpread"] = _median([row.get("spread_pct") for row in source_rows])
     summary["medianBuffer"] = _median([row.get("breakeven_buffer") for row in source_rows])
@@ -688,15 +1032,18 @@ async def build_options_payload(
     raw_tickers: str | list[str] | None = None,
     mode: str = "quick",
     allow_initial_full: bool = False,
+    source: str | None = None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     tickers = normalize_tickers(raw_tickers)
+    normalized_source = _normalize_data_source(settings, source)
     payload = (
-        await build_full_payload(settings, tickers)
+        await build_full_payload(settings, tickers, source=normalized_source)
         if mode == "full"
-        else await build_quick_payload(settings, tickers, allow_initial_full=allow_initial_full)
+        else await build_quick_payload(settings, tickers, source=normalized_source, allow_initial_full=allow_initial_full)
     )
     payload["summary"]["elapsedSeconds"] = round(time.perf_counter() - started, 2)
+    payload["summary"]["dataSource"] = normalized_source
     return payload
 
 

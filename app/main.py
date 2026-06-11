@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -30,7 +33,7 @@ from app.models import (
     utcnow,
 )
 from app.security import sign_payload, verify_payload
-from app.services.emailer import send_magic_link
+from app.services.emailer import send_login_code, send_magic_link
 from app.services.dashboard import (
     dashboard_tickers,
     get_dashboard_snapshot,
@@ -38,13 +41,17 @@ from app.services.dashboard import (
 )
 from app.services.feed_localization import localize_feed_for_zh
 from app.services.market_data import fetch_dashboard_market_data
-from app.services.options_analysis import build_options_payload, search_option_tickers
+from app.services.options_analysis import build_options_payload, options_progress_snapshot, search_option_tickers
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
 from app.services.seed import seed_defaults
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 SESSION_COOKIE = "serenity_session"
+PASSWORD_HASH_ALGORITHM = "pbkdf2_sha256"
+PASSWORD_HASH_ITERATIONS = 210_000
+PASSWORD_MIN_LENGTH = 8
+AUTH_CODE_PURPOSES = {"login", "register", "reset"}
 
 
 @asynccontextmanager
@@ -98,6 +105,36 @@ class AuthRequest(BaseModel):
     email: str
 
 
+class AuthCodeRequest(BaseModel):
+    email: str
+    purpose: str = "login"
+
+
+class AuthCodeVerifyRequest(BaseModel):
+    email: str
+    code: str
+    challenge_token: str
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    code: str
+    challenge_token: str
+
+
+class PasswordLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+    password: str
+    code: str
+    challenge_token: str
+
+
 class PushSubscribeRequest(BaseModel):
     subscription: dict
 
@@ -130,6 +167,132 @@ def clean_email(email: str) -> str:
     if "@" not in email or len(email) > 320:
         raise HTTPException(status_code=400, detail="Invalid email")
     return email
+
+
+def login_code_hash(settings: Settings, email: str, code: str, salt: str) -> str:
+    return hmac.new(
+        settings.secret_key.encode(),
+        f"{email}:{code}:{salt}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def clean_code_purpose(value: str) -> str:
+    purpose = value.strip().lower()
+    if purpose not in AUTH_CODE_PURPOSES:
+        raise HTTPException(status_code=400, detail="Invalid verification purpose")
+    return purpose
+
+
+def clean_password(password: str) -> str:
+    password = password or ""
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {PASSWORD_MIN_LENGTH} characters",
+        )
+    return password
+
+
+def password_hash(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt.encode(),
+        PASSWORD_HASH_ITERATIONS,
+    ).hex()
+    return f"{PASSWORD_HASH_ALGORITHM}${PASSWORD_HASH_ITERATIONS}${salt}${digest}"
+
+
+def password_matches(password: str, stored_hash: str | None) -> bool:
+    if not stored_hash:
+        return False
+    try:
+        algorithm, iterations, salt, expected = stored_hash.split("$", 3)
+        if algorithm != PASSWORD_HASH_ALGORITHM:
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode(),
+            salt.encode(),
+            int(iterations),
+        ).hex()
+    except (TypeError, ValueError):
+        return False
+    return hmac.compare_digest(digest, expected)
+
+
+def verify_email_code_challenge(
+    settings: Settings,
+    email: str,
+    code: str,
+    challenge_token: str,
+    purpose: str,
+) -> None:
+    cleaned_code = code.strip().replace(" ", "")
+    challenge = verify_payload(challenge_token, settings.secret_key)
+    challenge_purpose = str(challenge.get("purpose", "login")) if challenge else ""
+    if (
+        not challenge
+        or challenge.get("typ") != "email_code"
+        or challenge.get("email") != email
+        or challenge_purpose != purpose
+        or not hmac.compare_digest(
+            str(challenge.get("code_hash", "")),
+            login_code_hash(
+                settings,
+                email,
+                cleaned_code,
+                str(challenge.get("salt", "")),
+            ),
+        )
+    ):
+        raise HTTPException(
+            status_code=400, detail="Verification code is invalid or expired"
+        )
+
+
+def serialize_user_session(db: Session, user: User) -> dict:
+    subscription = active_subscription(db, user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "is_admin": user.is_admin,
+        "has_password": bool(user.password_hash),
+        "subscription": {
+            "active": bool(subscription),
+            "expires_at": subscription.expires_at.isoformat()
+            if subscription is not True and subscription
+            else None,
+        },
+    }
+
+
+def get_or_create_user(db: Session, settings: Settings, email: str) -> User:
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = User(email=email, is_admin=email in settings.admin_emails)
+        db.add(user)
+    elif email in settings.admin_emails and not user.is_admin:
+        user.is_admin = True
+    user.last_login_at = utcnow()
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create_session_for_user(
+    response: Response,
+    settings: Settings,
+    user: User,
+) -> None:
+    session_token = sign_payload(
+        {"typ": "session", "uid": user.id},
+        settings.secret_key,
+        settings.session_ttl_seconds,
+    )
+    set_session_cookie(response, settings, session_token)
 
 
 def current_user(
@@ -176,26 +339,6 @@ def active_subscription(db: Session, user: User, monitor_list_id: str | None = N
     if monitor_list_id:
         query = query.filter(Subscription.monitor_list_id == monitor_list_id)
     return query.order_by(Subscription.expires_at.desc()).first()
-
-
-def accessible_monitor_list_ids(db: Session, user: User) -> list[str]:
-    if user.is_admin:
-        return [
-            item.id
-            for item in db.query(MonitorList)
-            .filter(MonitorList.is_active.is_(True))
-            .all()
-        ]
-    subscriptions = (
-        db.query(Subscription)
-        .filter(
-            Subscription.user_id == user.id,
-            Subscription.status == "active",
-            Subscription.expires_at > utcnow(),
-        )
-        .all()
-    )
-    return [item.monitor_list_id for item in subscriptions]
 
 
 def grant_membership(db: Session, user: User, months: int = 1) -> Subscription:
@@ -267,6 +410,11 @@ async def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/login")
+async def login_page():
+    return FileResponse(STATIC_DIR / "login.html")
+
+
 @app.get("/options")
 async def options_page():
     return FileResponse(STATIC_DIR / "options.html")
@@ -308,6 +456,118 @@ async def request_login(
     return {"ok": True, **result}
 
 
+@app.post("/api/auth/code/request")
+async def request_login_code(
+    payload: AuthCodeRequest,
+    settings: Settings = Depends(get_settings),
+):
+    email = clean_email(payload.email)
+    purpose = clean_code_purpose(payload.purpose)
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    salt = secrets.token_urlsafe(12)
+    challenge_token = sign_payload(
+        {
+            "typ": "email_code",
+            "email": email,
+            "purpose": purpose,
+            "salt": salt,
+            "code_hash": login_code_hash(settings, email, code, salt),
+        },
+        settings.secret_key,
+        settings.magic_link_ttl_seconds,
+    )
+    result = await send_login_code(settings, email, code, purpose=purpose)
+    return {"ok": True, "challenge_token": challenge_token, **result}
+
+
+@app.post("/api/auth/code/verify")
+async def verify_login_code(
+    payload: AuthCodeVerifyRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    email = clean_email(payload.email)
+    verify_email_code_challenge(
+        settings, email, payload.code, payload.challenge_token, "login"
+    )
+
+    user = get_or_create_user(db, settings, email)
+    create_session_for_user(response, settings, user)
+    return {"ok": True, "user": serialize_user_session(db, user)}
+
+
+@app.post("/api/auth/register")
+async def register_account(
+    payload: RegisterRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    email = clean_email(payload.email)
+    password = clean_password(payload.password)
+    verify_email_code_challenge(
+        settings, email, payload.code, payload.challenge_token, "register"
+    )
+    user = db.query(User).filter(User.email == email).first()
+    if user and user.password_hash:
+        raise HTTPException(status_code=409, detail="Account already has a password")
+    if not user:
+        user = User(email=email, is_admin=email in settings.admin_emails)
+        db.add(user)
+    elif email in settings.admin_emails and not user.is_admin:
+        user.is_admin = True
+    user.password_hash = password_hash(password)
+    user.last_login_at = utcnow()
+    db.commit()
+    db.refresh(user)
+    create_session_for_user(response, settings, user)
+    return {"ok": True, "user": serialize_user_session(db, user)}
+
+
+@app.post("/api/auth/login")
+async def password_login(
+    payload: PasswordLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    email = clean_email(payload.email)
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not password_matches(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if email in settings.admin_emails and not user.is_admin:
+        user.is_admin = True
+    user.last_login_at = utcnow()
+    db.commit()
+    db.refresh(user)
+    create_session_for_user(response, settings, user)
+    return {"ok": True, "user": serialize_user_session(db, user)}
+
+
+@app.post("/api/auth/password/reset")
+async def reset_password(
+    payload: PasswordResetRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    email = clean_email(payload.email)
+    password = clean_password(payload.password)
+    verify_email_code_challenge(
+        settings, email, payload.code, payload.challenge_token, "reset"
+    )
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found")
+    user.password_hash = password_hash(password)
+    user.last_login_at = utcnow()
+    db.commit()
+    db.refresh(user)
+    create_session_for_user(response, settings, user)
+    return {"ok": True, "user": serialize_user_session(db, user)}
+
+
 @app.get("/auth/verify")
 async def verify_login(
     token: str,
@@ -319,16 +579,7 @@ async def verify_login(
         raise HTTPException(status_code=400, detail="Login link is invalid or expired")
 
     email = clean_email(payload["email"])
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        user = User(email=email, is_admin=email in settings.admin_emails)
-        db.add(user)
-    elif email in settings.admin_emails and not user.is_admin:
-        user.is_admin = True
-
-    user.last_login_at = utcnow()
-    db.commit()
-    db.refresh(user)
+    user = get_or_create_user(db, settings, email)
 
     session_token = sign_payload(
         {"typ": "session", "uid": user.id},
@@ -384,10 +635,20 @@ async def dashboard(
 async def options_scan(
     tickers: str = "",
     mode: str = "quick",
+    source: str = "",
     allowInitialFull: bool = False,
     settings: Settings = Depends(get_settings),
 ):
-    return await build_options_payload(settings, tickers, mode, allow_initial_full=allowInitialFull)
+    return await build_options_payload(settings, tickers, mode, allow_initial_full=allowInitialFull, source=source)
+
+
+@app.get("/api/options/progress")
+async def options_progress(
+    tickers: str = "",
+    source: str = "",
+    settings: Settings = Depends(get_settings),
+):
+    return options_progress_snapshot(settings, tickers, source=source)
 
 
 @app.get("/api/options/tickers")
@@ -442,22 +703,16 @@ async def me(
         settings.session_ttl_seconds,
     )
     set_session_cookie(response, settings, session_token)
-    subscription = active_subscription(db, user)
-    return {
-        "id": user.id,
-        "email": user.email,
-        "is_admin": user.is_admin,
-        "subscription": {
-            "active": bool(subscription),
-            "expires_at": subscription.expires_at.isoformat()
-            if subscription is not True and subscription
-            else None,
-        },
-    }
+    return serialize_user_session(db, user)
 
 
 @app.get("/api/lists")
-async def lists(user: User = Depends(current_user), db: Session = Depends(get_db)):
+async def lists(
+    request: Request,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    user = optional_current_user(request, db, settings)
     monitor_lists = (
         db.query(MonitorList).filter(MonitorList.is_active.is_(True)).all()
     )
@@ -467,7 +722,10 @@ async def lists(user: User = Depends(current_user), db: Session = Depends(get_db
             "slug": item.slug,
             "name": item.name,
             "description": item.description,
-            "subscription_active": bool(active_subscription(db, user, item.id)),
+            "public_access": True,
+            "subscription_active": bool(active_subscription(db, user, item.id))
+            if user
+            else False,
         }
         for item in monitor_lists
     ]
@@ -512,13 +770,17 @@ async def current_payment(
 
 @app.get("/api/feed")
 async def feed(
-    user: User = Depends(current_user),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     limit: int = 30,
     lang: str = "en",
 ):
-    list_ids = accessible_monitor_list_ids(db, user)
+    list_ids = [
+        item.id
+        for item in db.query(MonitorList)
+        .filter(MonitorList.is_active.is_(True))
+        .all()
+    ]
     if not list_ids:
         return []
     summaries = (

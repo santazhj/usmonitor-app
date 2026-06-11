@@ -1,3 +1,5 @@
+import * as THREE from "/static/vendor/three.module.min.js";
+
 const authView = document.querySelector("#authView");
 const memberView = document.querySelector("#memberView");
 const loginForm = document.querySelector("#loginForm");
@@ -54,6 +56,9 @@ const COPY = {
     "hero.title": "美股 AI 产业链终端",
     "hero.lede":
       "按算力、半导体、光互连、电力和软件分层跟踪核心标的，聚焦价格、流动性和产业链瓶颈。",
+    "hero.pill.watchlist": "产业链矩阵",
+    "hero.pill.sources": "数据源巡检",
+    "hero.pill.alerts": "精选情报流",
     "dashboard.refreshTarget": "{seconds}s 刷新目标",
     "dashboard.updated": "更新于 {date}",
     "dashboard.unavailable": "看板暂不可用",
@@ -65,6 +70,11 @@ const COPY = {
     "metrics.fundamentals": "基本面",
     "metrics.core": "核心瓶颈",
     "metrics.attention": "高关注",
+    "metrics.detail.tracked": "全球 AI 暴露池",
+    "metrics.detail.priced": "已接入行情",
+    "metrics.detail.fundamentals": "基本面覆盖",
+    "metrics.detail.core": "供给瓶颈层",
+    "metrics.detail.attention": "高波动关注",
     "search.label": "搜索",
     "search.placeholder": "Ticker、公司、AI 角色",
     "tabs.all": "全部",
@@ -77,6 +87,9 @@ const COPY = {
     "table.aiRole": "AI 角色",
     "table.latestSignal": "最新观察",
     "table.pending": "待接入",
+    "table.sectionEyebrow": "Watchlist matrix",
+    "table.sectionTitle": "产业链标的矩阵",
+    "table.sectionMeta": "点击行查看产业链定位",
     "sort.ticker": "代码",
     "sort.price": "价格",
     "sort.change_percent": "% 涨跌",
@@ -89,17 +102,19 @@ const COPY = {
     "drawer.positioning": "产业链定位",
     "drawer.updated": "行情更新",
     "drawer.source": "来源",
+    "product3d.eyebrow": "产品形象",
+    "product3d.hint": "拖拽旋转，悬停查看发光状态",
     "rail.sourceEyebrow": "数据源状态",
     "rail.sourceTitle": "数据状态",
     "rail.alertsEyebrow": "提醒",
     "rail.alertsTitle": "最新情报",
-    "alerts.signedOut": "登录后查看完整 alert feed。",
+    "alerts.signedOut": "正在加载公开情报 feed。",
     "alerts.loading": "正在加载并翻译最新情报...",
     "alerts.loadFailed": "最新情报暂时加载失败，请稍后刷新。",
     "alerts.empty": "暂无提醒。",
     "alerts.viewSource": "查看原帖",
     "auth.eyebrow": "邮箱注册",
-    "auth.title": "邮箱注册 / 登录",
+    "auth.title": "免费注册 / 登录",
     "auth.email": "邮箱",
     "auth.submit": "发送登录链接",
     "auth.sending": "发送中...",
@@ -138,10 +153,11 @@ const COPY = {
     "lists.title": "订阅列表",
     "lists.active": "已开通",
     "lists.locked": "高级会员",
+    "lists.public": "公开可见",
     "terms.eyebrow": "定位",
     "terms.title": "情报摘要，不是交易建议",
     "terms.body":
-      "邮箱可直接注册免费版。高级 alert 和推送权限需付款，或由后台手动开通会员。"
+      "当前市场数据和情报先公开展示；邮箱注册用于账户、推送、付款和后续 VIP 权限。"
   },
   en: {
     "app.title": "US Monitor",
@@ -158,6 +174,9 @@ const COPY = {
     "hero.title": "US AI Supply Chain Terminal",
     "hero.lede":
       "A compact AI supply-chain terminal grouped by compute, semiconductors, optical links, power, and software.",
+    "hero.pill.watchlist": "Watchlist matrix",
+    "hero.pill.sources": "Live source checks",
+    "hero.pill.alerts": "Curated alert feed",
     "dashboard.refreshTarget": "{seconds}s refresh target",
     "dashboard.updated": "Updated {date}",
     "dashboard.unavailable": "Dashboard unavailable",
@@ -169,6 +188,11 @@ const COPY = {
     "metrics.fundamentals": "Fundamentals",
     "metrics.core": "Core Chokepoints",
     "metrics.attention": "High Attention",
+    "metrics.detail.tracked": "Global AI exposure set",
+    "metrics.detail.priced": "Market data coverage",
+    "metrics.detail.fundamentals": "Fundamental coverage",
+    "metrics.detail.core": "Supply constraint layers",
+    "metrics.detail.attention": "High-volatility focus",
     "search.label": "Search",
     "search.placeholder": "Ticker, company, AI role",
     "tabs.all": "All",
@@ -181,6 +205,9 @@ const COPY = {
     "table.aiRole": "AI Role",
     "table.latestSignal": "Latest Signal",
     "table.pending": "Pending",
+    "table.sectionEyebrow": "Watchlist matrix",
+    "table.sectionTitle": "Supply-chain ticker matrix",
+    "table.sectionMeta": "Click any row for positioning detail",
     "sort.ticker": "Ticker",
     "sort.price": "Price",
     "sort.change_percent": "% Chg",
@@ -193,17 +220,19 @@ const COPY = {
     "drawer.positioning": "Supply-chain position",
     "drawer.updated": "Market updated",
     "drawer.source": "Source",
+    "product3d.eyebrow": "Product Object",
+    "product3d.hint": "Drag to rotate; hover to energize",
     "rail.sourceEyebrow": "Source Status",
     "rail.sourceTitle": "Data Status",
     "rail.alertsEyebrow": "Alerts",
     "rail.alertsTitle": "Latest Intelligence",
-    "alerts.signedOut": "Sign in to view the full alert feed.",
+    "alerts.signedOut": "Loading the public alert feed.",
     "alerts.loading": "Loading and translating latest alerts...",
     "alerts.loadFailed": "Latest alerts could not be loaded. Please refresh later.",
     "alerts.empty": "No alerts yet.",
     "alerts.viewSource": "View source post",
     "auth.eyebrow": "Email Access",
-    "auth.title": "Sign up or sign in with email",
+    "auth.title": "Free sign up or sign in",
     "auth.email": "Email",
     "auth.submit": "Send login link",
     "auth.sending": "Sending...",
@@ -242,10 +271,11 @@ const COPY = {
     "lists.title": "Subscribed Lists",
     "lists.active": "Active",
     "lists.locked": "Premium",
+    "lists.public": "Public",
     "terms.eyebrow": "Positioning",
     "terms.title": "Intelligence summaries, not trading advice",
     "terms.body":
-      "Anyone can sign up for a free account with email. Premium alerts and push access require payment or manual admin activation."
+      "Market data and intelligence are public for now. Email registration powers accounts, push, payment, and future VIP access."
   }
 };
 
@@ -447,6 +477,7 @@ let searchQuery = localStorage.getItem(SEARCH_KEY) || "";
 let sortField = localStorage.getItem(SORT_FIELD_KEY) || DEFAULT_SORT_FIELD;
 let sortDirection = localStorage.getItem(SORT_DIRECTION_KEY) || DEFAULT_SORT_DIRECTION;
 let activeDrawerTicker = null;
+let activeProductScene = null;
 let authChecked = false;
 let currentUser = null;
 let currentLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY));
@@ -653,16 +684,19 @@ function updatePlanBadge(me) {
 function showSignedOut() {
   currentUser = null;
   authChecked = true;
-  authView.classList.remove("hidden");
-  memberView.classList.add("hidden");
+  authView?.classList.add("hidden");
+  memberView?.classList.add("hidden");
   logoutBtn.classList.add("hidden");
   adminLink.classList.add("hidden");
   const rememberedEmail = localStorage.getItem(LAST_EMAIL_KEY) || "";
-  const emailInput = loginForm.querySelector('input[name="email"]');
+  const emailInput = loginForm?.querySelector('input[name="email"]');
   if (rememberedEmail && emailInput && !emailInput.value) {
     emailInput.value = rememberedEmail;
-    loginMessage.textContent = t("auth.remembered");
+    if (loginMessage) {
+      loginMessage.textContent = t("auth.remembered");
+    }
   }
+  loadFeed();
   updatePlanBadge(null);
 }
 
@@ -670,8 +704,8 @@ function showSignedIn(me) {
   currentUser = me;
   authChecked = true;
   localStorage.setItem(LAST_EMAIL_KEY, me.email);
-  authView.classList.add("hidden");
-  memberView.classList.remove("hidden");
+  authView?.classList.add("hidden");
+  memberView?.classList.add("hidden");
   logoutBtn.classList.remove("hidden");
   adminLink.classList.toggle("hidden", !me.is_admin);
   renderFeedLoading();
@@ -786,6 +820,67 @@ function fundamentalsLabel(snapshot) {
   return localizeValue("pending");
 }
 
+function numberOrZero(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function metricPercent(value, total) {
+  const denominator = numberOrZero(total);
+  if (!denominator) return 8;
+  return (numberOrZero(value) / denominator) * 100;
+}
+
+function metricFillStyle(percent) {
+  const clamped = Math.max(8, Math.min(100, Math.round(numberOrZero(percent))));
+  return `--metric-fill: ${clamped}%`;
+}
+
+function dashboardMetricCards(snapshot) {
+  const tracked = numberOrZero(snapshot.metrics.tracked_tickers);
+  const market = marketSource(snapshot);
+  const loaded = numberOrZero(market.loaded_tickers);
+  const fundamentalsLoaded = numberOrZero(market.fundamentals_loaded);
+  const fundamentalsTotal = loaded || tracked;
+  return [
+    {
+      label: t("metrics.tracked"),
+      value: snapshot.metrics.tracked_tickers,
+      detail: t("metrics.detail.tracked"),
+      tone: "cyan",
+      fill: 100
+    },
+    {
+      label: t("metrics.priced"),
+      value: snapshot.metrics.priced_tickers,
+      detail: t("metrics.detail.priced"),
+      tone: "green",
+      fill: metricPercent(snapshot.metrics.priced_tickers, tracked)
+    },
+    {
+      label: t("metrics.fundamentals"),
+      value: fundamentalsLabel(snapshot),
+      detail: t("metrics.detail.fundamentals"),
+      tone: "blue",
+      fill: market.status === "live" ? metricPercent(fundamentalsLoaded, fundamentalsTotal) : 8
+    },
+    {
+      label: t("metrics.core"),
+      value: snapshot.metrics.core_chokepoints,
+      detail: t("metrics.detail.core"),
+      tone: "amber",
+      fill: metricPercent(snapshot.metrics.core_chokepoints, tracked)
+    },
+    {
+      label: t("metrics.attention"),
+      value: snapshot.metrics.high_attention,
+      detail: t("metrics.detail.attention"),
+      tone: "red",
+      fill: metricPercent(snapshot.metrics.high_attention, tracked)
+    }
+  ];
+}
+
 function sortLabel(field = sortField) {
   return t(`sort.${field}`);
 }
@@ -865,18 +960,14 @@ function renderDashboard() {
     date: formatDate(snapshot.generated_at)
   });
 
-  dashboardMetrics.innerHTML = [
-    [t("metrics.tracked"), snapshot.metrics.tracked_tickers],
-    [t("metrics.priced"), snapshot.metrics.priced_tickers],
-    [t("metrics.fundamentals"), fundamentalsLabel(snapshot)],
-    [t("metrics.core"), snapshot.metrics.core_chokepoints],
-    [t("metrics.attention"), snapshot.metrics.high_attention]
-  ]
+  dashboardMetrics.innerHTML = dashboardMetricCards(snapshot)
     .map(
-      ([label, value]) => `
-        <article>
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
+      (metric) => `
+        <article class="metric-card tone-${escapeHtml(metric.tone)}" style="${metricFillStyle(metric.fill)}">
+          <span>${escapeHtml(metric.label)}</span>
+          <strong>${escapeHtml(metric.value)}</strong>
+          <small>${escapeHtml(metric.detail)}</small>
+          <div class="metric-progress" aria-hidden="true"><i></i></div>
         </article>`
     )
     .join("");
@@ -933,13 +1024,18 @@ function renderDashboard() {
               <span>${escapeHtml(localizeCompany(row))}</span>
             </div>
             <span class="price-cell">${escapeHtml(formatPriceWithCurrency(row))}</span>
-            <span class="change-cell ${escapeHtml(valueClass(row.change_percent))}">
-              ${escapeHtml(formatPercent(row.change_percent))}
+            <span class="change-cell">
+              <span class="change-pill ${escapeHtml(valueClass(row.change_percent))}">
+                ${escapeHtml(formatPercent(row.change_percent))}
+              </span>
             </span>
             <span class="number-cell">${escapeHtml(formatMarketCap(row.market_cap))}</span>
             <span class="number-cell">${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
             <span class="number-cell">${escapeHtml(formatPERatio(row))}</span>
-            <span>${escapeHtml(localizeRow(row, "role"))}</span>
+            <span class="role-cell">
+              <strong>${escapeHtml(localizeRow(row, "role"))}</strong>
+              <small>${escapeHtml(localizeRow(row, "latest_signal") || t("table.pending"))}</small>
+            </span>
           </article>`
       )
       .join("");
@@ -985,9 +1081,360 @@ function drawerMetric(label, value, className = "") {
     </article>`;
 }
 
+const PRODUCT_PROFILE_OVERRIDES = {
+  NVDA: ["accelerator", "Blackwell AI accelerator"],
+  AMD: ["accelerator", "Instinct GPU accelerator"],
+  AVGO: ["network", "Custom AI ASIC"],
+  MRVL: ["network", "Electro-optical DSP"],
+  ANET: ["network", "AI Ethernet switch"],
+  ALAB: ["network", "PCIe/CXL retimer"],
+  CRDO: ["network", "Active electrical cable"],
+  MSFT: ["cloud", "Azure AI cloud rack"],
+  GOOGL: ["cloud", "TPU AI pod"],
+  AMZN: ["cloud", "Trainium AI cluster"],
+  META: ["cloud", "AI factory rack"],
+  ORCL: ["cloud", "GPU cloud capacity"],
+  NBIS: ["cloud", "AI cloud rack"],
+  TSM: ["foundry", "CoWoS advanced package"],
+  ASML: ["foundry", "EUV lithography module"],
+  AMAT: ["foundry", "Deposition tool module"],
+  LRCX: ["foundry", "Etch process chamber"],
+  KLAC: ["foundry", "Process-control sensor"],
+  "6857.T": ["foundry", "AI chip tester"],
+  "BESI.AS": ["foundry", "Hybrid bonding module"],
+  MU: ["memory", "HBM memory stack"],
+  "000660.KS": ["memory", "HBM memory stack"],
+  "005930.KS": ["memory", "HBM and DRAM stack"],
+  SNDK: ["memory", "AI eSSD storage stack"],
+  SIMO: ["memory", "NAND controller module"],
+  EWY: ["memory", "Korea memory basket"],
+  "4062.T": ["foundry", "ABF substrate panel"],
+  "3037.TW": ["foundry", "AI server PCB"],
+  "2802.T": ["foundry", "ABF film material"],
+  "ATS.VI": ["foundry", "IC substrate panel"],
+  AEHR: ["foundry", "Wafer-level test module"],
+  COHR: ["optics", "AI laser transmitter"],
+  LITE: ["optics", "Datacom optical engine"],
+  FN: ["optics", "800G optical module"],
+  GLW: ["optics", "Optical glass fiber"],
+  AAOI: ["optics", "AI optical transceiver"],
+  AXTI: ["optics", "InP substrate wafer"],
+  "SIVE.ST": ["optics", "DFB laser array"],
+  "SOI.PA": ["optics", "SOI photonics wafer"],
+  "IQE.L": ["optics", "Compound epitaxy wafer"],
+  TSEM: ["foundry", "Specialty foundry wafer"],
+  VRT: ["power", "Liquid cooling CDU"],
+  ETN: ["power", "Data-center switchgear"],
+  "SU.PA": ["power", "Power management module"],
+  NVT: ["power", "Electrical enclosure"],
+  MOD: ["power", "Cooling plate module"],
+  BE: ["power", "Onsite fuel-cell power"],
+  CEG: ["power", "Clean power supply"],
+  GEV: ["power", "Grid equipment module"],
+  PWR: ["power", "Transmission buildout"],
+  XLU: ["power", "Power utility basket"],
+  PLTR: ["software", "AI workflow platform"],
+  SNOW: ["software", "AI data cloud"],
+  DDOG: ["software", "Observability control plane"],
+  CRWD: ["software", "AI security platform"],
+  RDDT: ["software", "Data licensing node"],
+  FIG: ["software", "AI design workspace"]
+};
+
+const PRODUCT_TONE = {
+  accelerator: { accent: 0x67e8f9, secondary: 0x93c5fd },
+  cloud: { accent: 0x7dd3fc, secondary: 0xa78bfa },
+  foundry: { accent: 0xfcd34d, secondary: 0x67e8f9 },
+  memory: { accent: 0x6ee7b7, secondary: 0x93c5fd },
+  network: { accent: 0x67e8f9, secondary: 0x6ee7b7 },
+  optics: { accent: 0xf0abfc, secondary: 0x67e8f9 },
+  power: { accent: 0xfcd34d, secondary: 0x6ee7b7 },
+  software: { accent: 0xa78bfa, secondary: 0x67e8f9 }
+};
+
+function inferProductType(row) {
+  const combined = `${row.category || ""} ${row.ai_layer || ""} ${row.role || ""}`.toLowerCase();
+  if (combined.includes("memory") || combined.includes("hbm") || combined.includes("dram") || combined.includes("storage")) return "memory";
+  if (combined.includes("optical") || combined.includes("photon") || combined.includes("laser") || combined.includes("inp") || combined.includes("soi")) return "optics";
+  if (combined.includes("power") || combined.includes("cooling") || combined.includes("utility") || combined.includes("grid")) return "power";
+  if (combined.includes("software") || combined.includes("data") || combined.includes("security") || combined.includes("platform")) return "software";
+  if (combined.includes("foundry") || combined.includes("test") || combined.includes("packag") || combined.includes("substrate") || combined.includes("wafer")) return "foundry";
+  if (combined.includes("network") || combined.includes("asic") || combined.includes("ethernet") || combined.includes("serdes")) return "network";
+  if (combined.includes("cloud") || combined.includes("capex") || combined.includes("factory")) return "cloud";
+  return "accelerator";
+}
+
+function productProfile(row) {
+  const override = PRODUCT_PROFILE_OVERRIDES[row.ticker];
+  const type = override?.[0] || inferProductType(row);
+  const title = override?.[1] || localizeRow(row, "role") || localizeValue(row.category_label);
+  return {
+    type,
+    title,
+    subtitle: localizeCompany(row),
+    tone: PRODUCT_TONE[type] || PRODUCT_TONE.accelerator
+  };
+}
+
+function disposeObject3d(object) {
+  object.traverse((item) => {
+    item.geometry?.dispose?.();
+    if (Array.isArray(item.material)) {
+      item.material.forEach((material) => material.dispose?.());
+    } else {
+      item.material?.dispose?.();
+    }
+  });
+}
+
+function disposeProductScene() {
+  if (!activeProductScene) return;
+  activeProductScene.resizeObserver?.disconnect();
+  activeProductScene.cancel();
+  activeProductScene.dispose();
+  activeProductScene = null;
+}
+
+function productMaterial(color, emissive = 0x07131f, opacity = 1) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive,
+    emissiveIntensity: 0.28,
+    metalness: 0.64,
+    roughness: 0.28,
+    transparent: opacity < 1,
+    opacity
+  });
+}
+
+function edgeOverlay(mesh, color = 0x67e8f9) {
+  const edges = new THREE.EdgesGeometry(mesh.geometry);
+  return new THREE.LineSegments(
+    edges,
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.38 })
+  );
+}
+
+function addBox(group, size, position, material, edgeColor) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  mesh.position.set(...position);
+  mesh.add(edgeOverlay(mesh, edgeColor));
+  group.add(mesh);
+  return mesh;
+}
+
+function addCylinder(group, radiusTop, radiusBottom, height, position, rotation, material, edgeColor, segments = 48) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+    material
+  );
+  mesh.position.set(...position);
+  mesh.rotation.set(...rotation);
+  mesh.add(edgeOverlay(mesh, edgeColor));
+  group.add(mesh);
+  return mesh;
+}
+
+function buildProductObject(profile) {
+  const group = new THREE.Group();
+  const accent = profile.tone.accent;
+  const secondary = profile.tone.secondary;
+  const primary = productMaterial(accent, accent);
+  const secondaryMaterial = productMaterial(secondary, secondary);
+  const dark = productMaterial(0x111827, accent);
+  const glass = productMaterial(secondary, secondary, 0.48);
+
+  if (profile.type === "cloud") {
+    [-0.58, 0, 0.58].forEach((x, index) => {
+      addBox(group, [0.36, 1.36, 0.28], [x, 0, 0], dark, accent);
+      addBox(group, [0.24, 0.1, 0.32], [x, 0.43 - index * 0.12, 0.18], primary, accent);
+      addBox(group, [0.24, 0.1, 0.32], [x, 0.05 - index * 0.08, 0.18], secondaryMaterial, secondary);
+    });
+    addCylinder(group, 0.9, 0.9, 0.035, [0, -0.82, 0], [Math.PI / 2, 0, 0], glass, secondary);
+  } else if (profile.type === "memory") {
+    for (let i = 0; i < 6; i += 1) {
+      addBox(group, [1.5, 0.12, 0.95], [0, -0.36 + i * 0.16, 0], i % 2 ? dark : primary, accent);
+    }
+    addBox(group, [1.74, 0.05, 1.12], [0, -0.52, 0], secondaryMaterial, secondary);
+    addCylinder(group, 0.7, 0.7, 0.035, [0, 0.68, 0], [Math.PI / 2, 0, 0], glass, secondary);
+  } else if (profile.type === "optics") {
+    addCylinder(group, 0.18, 0.18, 1.9, [0, 0, 0], [0, 0, Math.PI / 2], glass, secondary);
+    addBox(group, [1.45, 0.34, 0.48], [0, 0, 0], dark, accent);
+    addBox(group, [0.28, 0.2, 0.64], [-0.52, 0, 0.02], primary, accent);
+    addBox(group, [0.28, 0.2, 0.64], [0.52, 0, 0.02], secondaryMaterial, secondary);
+    addCylinder(group, 0.24, 0.24, 0.08, [-0.94, 0, 0], [0, Math.PI / 2, 0], primary, accent);
+    addCylinder(group, 0.24, 0.24, 0.08, [0.94, 0, 0], [0, Math.PI / 2, 0], secondaryMaterial, secondary);
+  } else if (profile.type === "power") {
+    addCylinder(group, 0.5, 0.62, 0.9, [0, -0.1, 0], [0, 0, 0], dark, accent);
+    addCylinder(group, 0.78, 0.78, 0.08, [0, 0.44, 0], [0, 0, 0], primary, accent);
+    addCylinder(group, 0.88, 0.88, 0.04, [0, -0.6, 0], [0, 0, 0], secondaryMaterial, secondary);
+    for (let i = 0; i < 6; i += 1) {
+      const blade = addBox(group, [0.12, 0.68, 0.05], [0, 0.78, 0], primary, accent);
+      blade.rotation.z = (Math.PI * 2 * i) / 6;
+      blade.position.x = Math.cos(blade.rotation.z) * 0.32;
+      blade.position.y = 0.78 + Math.sin(blade.rotation.z) * 0.32;
+    }
+  } else if (profile.type === "software") {
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.72, 1), glass);
+    group.add(core, edgeOverlay(core, accent));
+    [[1.15, 0, 0], [-1.15, 0, 0], [0, 1.02, 0], [0, -1.02, 0], [0, 0, 1.05]].forEach((position, index) => {
+      const node = new THREE.Mesh(
+        new THREE.SphereGeometry(index === 0 ? 0.16 : 0.12, 24, 16),
+        index % 2 ? secondaryMaterial : primary
+      );
+      node.position.set(...position);
+      group.add(node);
+    });
+  } else if (profile.type === "foundry") {
+    addCylinder(group, 0.78, 0.78, 0.08, [0, 0, 0], [Math.PI / 2, 0, 0], glass, secondary);
+    addBox(group, [1.3, 0.18, 0.86], [0, 0.05, 0.14], dark, accent);
+    addBox(group, [0.58, 0.16, 0.46], [0, 0.22, 0.24], primary, accent);
+    addCylinder(group, 0.26, 0.26, 0.08, [-0.54, -0.04, 0.25], [Math.PI / 2, 0, 0], secondaryMaterial, secondary);
+    addCylinder(group, 0.26, 0.26, 0.08, [0.54, -0.04, 0.25], [Math.PI / 2, 0, 0], secondaryMaterial, secondary);
+  } else {
+    addBox(group, [1.46, 0.16, 1.05], [0, 0, 0], dark, accent);
+    addBox(group, [0.82, 0.08, 0.58], [0, 0.13, 0], primary, accent);
+    for (let i = 0; i < 8; i += 1) {
+      const x = -0.66 + i * 0.19;
+      addBox(group, [0.05, 0.08, 0.18], [x, -0.02, 0.64], secondaryMaterial, secondary);
+      addBox(group, [0.05, 0.08, 0.18], [x, -0.02, -0.64], secondaryMaterial, secondary);
+    }
+  }
+
+  return group;
+}
+
+function renderProductScene(row) {
+  disposeProductScene();
+  const stage = drawerBody.querySelector("#productStage");
+  const canvas = drawerBody.querySelector("#productCanvas");
+  if (!stage || !canvas) return;
+
+  const profile = productProfile(row);
+  stage.querySelector("[data-product-title]").textContent = profile.title;
+  stage.querySelector("[data-product-subtitle]").textContent = profile.subtitle;
+  stage.dataset.productType = profile.type;
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  camera.position.set(0, 0.35, 4.4);
+  scene.add(new THREE.AmbientLight(0x9fb7d5, 0.72));
+
+  const keyLight = new THREE.DirectionalLight(profile.tone.accent, 1.65);
+  keyLight.position.set(2.2, 2.4, 3);
+  scene.add(keyLight);
+  const rimLight = new THREE.PointLight(profile.tone.secondary, 1.2, 10);
+  rimLight.position.set(-2, -1, 2);
+  scene.add(rimLight);
+
+  const object = buildProductObject(profile);
+  object.rotation.x = -0.22;
+  object.rotation.y = 0.52;
+  scene.add(object);
+
+  let frameId = 0;
+  let hovered = false;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  const velocity = { x: 0, y: 0.008 };
+
+  const sizeRenderer = () => {
+    const rect = stage.getBoundingClientRect();
+    const width = Math.max(260, Math.floor(rect.width));
+    const height = Math.max(240, Math.floor(rect.height));
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  };
+
+  const resizeObserver = new ResizeObserver(sizeRenderer);
+  resizeObserver.observe(stage);
+  sizeRenderer();
+
+  const onPointerEnter = () => {
+    hovered = true;
+    stage.classList.add("is-hot");
+  };
+  const onPointerLeave = () => {
+    hovered = false;
+    dragging = false;
+    stage.classList.remove("is-hot", "is-dragging");
+  };
+  const onPointerDown = (event) => {
+    hovered = true;
+    dragging = true;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    stage.classList.add("is-hot", "is-dragging");
+    canvas.setPointerCapture?.(event.pointerId);
+  };
+  const onPointerMove = (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    velocity.y = dx * 0.004;
+    velocity.x = dy * 0.003;
+    object.rotation.y += velocity.y;
+    object.rotation.x += velocity.x;
+  };
+  const onPointerUp = () => {
+    dragging = false;
+    stage.classList.remove("is-dragging");
+  };
+
+  stage.addEventListener("pointerenter", onPointerEnter);
+  stage.addEventListener("pointerleave", onPointerLeave);
+  canvas.addEventListener("pointerenter", onPointerEnter);
+  canvas.addEventListener("pointerleave", onPointerLeave);
+  canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", onPointerUp);
+
+  const animate = () => {
+    object.rotation.y += hovered ? 0.014 : 0.006;
+    object.rotation.x += dragging ? 0 : velocity.x * 0.18;
+    velocity.x *= 0.92;
+    velocity.y *= 0.92;
+    object.scale.setScalar(hovered ? 1.05 : 1);
+    renderer.render(scene, camera);
+    frameId = requestAnimationFrame(animate);
+  };
+  animate();
+
+  activeProductScene = {
+    resizeObserver,
+    cancel: () => cancelAnimationFrame(frameId),
+    dispose: () => {
+      stage.removeEventListener("pointerenter", onPointerEnter);
+      stage.removeEventListener("pointerleave", onPointerLeave);
+      canvas.removeEventListener("pointerenter", onPointerEnter);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+      disposeObject3d(object);
+      renderer.dispose();
+    }
+  };
+}
+
 function renderTickerDrawer(ticker) {
   const row = dashboardSnapshot?.rows.find((item) => item.ticker === ticker);
   if (!row) return;
+  disposeProductScene();
   activeDrawerTicker = ticker;
   drawerBody.innerHTML = `
     <p class="drawer-kicker">${escapeHtml(localizeValue(row.category_label))}</p>
@@ -1026,13 +1473,26 @@ function renderTickerDrawer(ticker) {
             <p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(row.source_url)}</a></p>
           </section>`
         : ""
-    }`;
+    }
+    <section class="drawer-section product-section">
+      <span>${escapeHtml(t("product3d.eyebrow"))}</span>
+      <div id="productStage" class="product-stage" data-product-type="">
+        <div class="product-stage-copy">
+          <strong data-product-title>--</strong>
+          <small data-product-subtitle>--</small>
+        </div>
+        <canvas id="productCanvas" class="product-canvas" aria-label="${escapeHtml(t("product3d.eyebrow"))}"></canvas>
+        <p class="product-hint">${escapeHtml(t("product3d.hint"))}</p>
+      </div>
+    </section>`;
   tickerDrawer.classList.remove("hidden");
   tickerDrawer.setAttribute("aria-hidden", "false");
+  renderProductScene(row);
 }
 
 function closeTickerDrawer() {
   activeDrawerTicker = null;
+  disposeProductScene();
   tickerDrawer.classList.add("hidden");
   tickerDrawer.setAttribute("aria-hidden", "true");
 }
@@ -1041,6 +1501,11 @@ async function loadApp(existingMe) {
   appConfig = await api("/api/config");
   const me = existingMe || (await api("/api/me"));
   showSignedIn(me);
+  if (!accountEmail || !subscriptionState) {
+    await loadFeed();
+    updatePushStatus();
+    return;
+  }
   accountEmail.textContent = me.email;
 
   let subscriptionTitle = t("account.pending");
@@ -1065,6 +1530,7 @@ async function loadApp(existingMe) {
 }
 
 async function loadLists() {
+  if (!listBox) return;
   const lists = await api("/api/lists");
   listBox.innerHTML = lists
     .map(
@@ -1075,7 +1541,11 @@ async function loadLists() {
             <span>${escapeHtml(localizeValue(item.description))}</span>
           </div>
           <mark>${escapeHtml(
-            item.subscription_active ? t("lists.active") : t("lists.locked")
+            item.subscription_active
+              ? t("lists.active")
+              : item.public_access
+                ? t("lists.public")
+                : t("lists.locked")
           )}</mark>
         </article>`
     )
@@ -1083,6 +1553,7 @@ async function loadLists() {
 }
 
 async function loadPayment() {
+  if (!paymentBox) return;
   const payment = await api("/api/payments/current");
   if (payment.admin_bypass) {
     paymentBox.innerHTML = `
@@ -1155,6 +1626,7 @@ async function loadFeed() {
 }
 
 function updatePushStatus() {
+  if (!pushStatus) return;
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     pushStatus.textContent = t("push.unsupported");
     return;
@@ -1166,6 +1638,7 @@ function updatePushStatus() {
 }
 
 async function enablePush() {
+  if (!pushStatus) return;
   if (!appConfig.vapid_public_key) {
     pushStatus.textContent = t("push.noVapid");
     return;
@@ -1193,6 +1666,7 @@ async function rerenderLanguageSensitiveSections() {
   if (currentUser) {
     await loadApp(currentUser);
   } else {
+    await loadFeed();
     updatePushStatus();
   }
 }
@@ -1250,7 +1724,7 @@ languageToggle.addEventListener("click", () => {
   rerenderLanguageSensitiveSections();
 });
 
-loginForm.addEventListener("submit", async (event) => {
+loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(loginForm);
   const email = String(form.get("email") || "").trim().toLowerCase();
@@ -1273,8 +1747,8 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-enablePushBtn.addEventListener("click", enablePush);
-testPushBtn.addEventListener("click", async () => {
+enablePushBtn?.addEventListener("click", enablePush);
+testPushBtn?.addEventListener("click", async () => {
   pushStatus.textContent = t("push.testing");
   const result = await api("/api/push/test", { method: "POST" });
   pushStatus.textContent = t("push.testDone", {
