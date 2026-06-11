@@ -428,26 +428,25 @@ async function refresh(mode = "quick") {
   setLoading(mode, true);
   els.tableStatus.textContent = mode === "full" ? "完整扫描中..." : "快速刷新中...";
   let progressTimer = null;
-  if (mode === "full") {
-    progress = {
-      active: true,
-      source: dataSource,
-      total: tickers.length,
-      completed: 0,
-      stage: "queued",
-      currentTicker: "",
-      message: `Queued ${tickers.length} tickers`,
-      contracts: 0,
-      quoteRequests: 0,
-      quotesWithBidAsk: 0,
-      quotesWithGreeks: 0,
-      events: [],
-      errors: []
-    };
-    renderProgress();
-    progressTimer = window.setInterval(fetchProgress, 900);
-    window.setTimeout(fetchProgress, 250);
-  }
+  progress = {
+    active: true,
+    source: dataSource,
+    mode,
+    total: tickers.length,
+    completed: 0,
+    stage: mode === "full" ? "queued" : "quick_refresh",
+    currentTicker: "",
+    message: mode === "full" ? `Queued ${tickers.length} tickers` : `Refreshing ${tickers.length} cached option quotes`,
+    contracts: 0,
+    quoteRequests: 0,
+    quotesWithBidAsk: 0,
+    quotesWithGreeks: 0,
+    events: [],
+    errors: []
+  };
+  renderProgress();
+  progressTimer = window.setInterval(fetchProgress, mode === "quick" ? 450 : 900);
+  window.setTimeout(fetchProgress, 250);
   try {
     payload = await api(
       `/api/options/scan?tickers=${encodeURIComponent(tickers.join(","))}&mode=${encodeURIComponent(mode)}&source=${encodeURIComponent(dataSource)}&allowInitialFull=false`
@@ -466,7 +465,7 @@ async function refresh(mode = "quick") {
     els.tableStatus.textContent = `扫描失败: ${error.message}`;
   } finally {
     if (progressTimer) window.clearInterval(progressTimer);
-    if (mode === "full") fetchProgress();
+    await fetchProgress();
     setLoading(mode, false);
   }
 }

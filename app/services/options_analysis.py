@@ -917,6 +917,14 @@ def _quick_no_cache_payload(tickers: list[str], source: str = "massive") -> dict
     }
 
 
+def _quote_has_bid_ask(record: dict[str, Any]) -> bool:
+    return (_to_float(record.get("bid"), 0.0) or 0.0) > 0 and (_to_float(record.get("ask"), 0.0) or 0.0) > 0
+
+
+def _quote_has_greeks(record: dict[str, Any]) -> bool:
+    return record.get("delta") is not None and record.get("iv") is not None
+
+
 async def _refresh_best_option(
     client: httpx.AsyncClient,
     settings: Settings,
@@ -968,7 +976,41 @@ async def build_quick_payload(
         payload["summary"]["refreshMode"] = "full_initial"
         return payload
     if cached is None:
+        _start_progress(key, normalized_source, tickers, mode="quick")
+        _update_progress(
+            key,
+            {
+                "stage": "no_cache",
+                "message": "Quick refresh needs one full scan first",
+                "total": 0,
+                "completed": 0,
+                "contracts": 0,
+                "quoteRequests": 0,
+                "quotesWithBidAsk": 0,
+                "quotesWithGreeks": 0,
+            },
+        )
+        _finish_progress(key, success=True, message="Run full scan first", contracts=0)
         return _quick_no_cache_payload(tickers, source=normalized_source)
+
+    rows_to_refresh = list(cached.get("underlyings") or [])
+    summary_before = dict(cached.get("summary") or {})
+    total_rows = len(rows_to_refresh)
+    total_contracts = int(summary_before.get("contracts") or sum(int(row.get("contractsScanned") or 0) for row in rows_to_refresh))
+    _start_progress(key, normalized_source, tickers, mode="quick")
+    _update_progress(
+        key,
+        {
+            "stage": "quick_refresh",
+            "message": f"Refreshing {total_rows} cached option quotes",
+            "total": total_rows,
+            "completed": 0,
+            "contracts": total_contracts,
+            "quoteRequests": 0,
+            "quotesWithBidAsk": 0,
+            "quotesWithGreeks": 0,
+        },
+    )
 
     if normalized_source == "ibkr":
         now = datetime.now(timezone.utc)
@@ -981,19 +1023,87 @@ async def build_quick_payload(
         summary["quickContractsRefreshed"] = 0
         summary["refreshMode"] = "quick_cached"
         cached["summary"] = summary
+        _update_progress(
+            key,
+            {
+                "stage": "quick_cached",
+                "message": "IBKR quick refresh uses the latest full-scan cache",
+                "total": total_rows,
+                "completed": total_rows,
+                "contracts": total_contracts,
+                "quoteRequests": 0,
+                "quotesWithBidAsk": 0,
+                "quotesWithGreeks": 0,
+            },
+        )
+        _finish_progress(key, success=True, message="Quick refresh used cached IBKR scan", contracts=total_contracts)
         return cached
 
     errors = list(cached.get("errors") or [])
     refreshed_count = 0
+    bid_ask_count = 0
+    greeks_count = 0
     async with httpx.AsyncClient() as client:
-        for row in cached.get("underlyings", []):
+        for idx, row in enumerate(rows_to_refresh, start=1):
+            ticker = str(row.get("ticker") or "").upper()
+            option_ticker = str(row.get("option_ticker") or "")
+            _update_progress(
+                key,
+                {
+                    "stage": "quote_refresh",
+                    "ticker": ticker,
+                    "message": f"{ticker}: refreshing {option_ticker or 'best contract'}",
+                    "total": total_rows,
+                    "completed": idx - 1,
+                    "contracts": total_contracts,
+                    "quoteRequests": idx - 1,
+                    "quotesWithBidAsk": bid_ask_count,
+                    "quotesWithGreeks": greeks_count,
+                },
+            )
             try:
                 refreshed = await _refresh_best_option(client, settings, row)
             except Exception as exc:  # noqa: BLE001
-                errors.append(f"{row.get('ticker')} quick refresh: {exc}")
+                error = f"{row.get('ticker')} quick refresh: {exc}"
+                errors.append(error)
+                _update_progress(
+                    key,
+                    {
+                        "stage": "error",
+                        "ticker": ticker,
+                        "message": error,
+                        "total": total_rows,
+                        "completed": idx,
+                        "contracts": total_contracts,
+                        "quoteRequests": idx,
+                        "quotesWithBidAsk": bid_ask_count,
+                        "quotesWithGreeks": greeks_count,
+                    },
+                )
                 continue
             row.update(refreshed)
             refreshed_count += 1
+            if _quote_has_bid_ask(refreshed):
+                bid_ask_count += 1
+            if _quote_has_greeks(refreshed):
+                greeks_count += 1
+            bid = _to_float(refreshed.get("bid"), 0.0) or 0.0
+            ask = _to_float(refreshed.get("ask"), 0.0) or 0.0
+            quote_message = f"{ticker}: {bid:.2f} / {ask:.2f}" if bid and ask else f"{ticker}: no valid bid/ask"
+            _update_progress(
+                key,
+                {
+                    "stage": "ticker_done",
+                    "ticker": ticker,
+                    "message": quote_message,
+                    "total": total_rows,
+                    "completed": idx,
+                    "contracts": total_contracts,
+                    "quoteRequests": idx,
+                    "quotesWithBidAsk": bid_ask_count,
+                    "quotesWithGreeks": greeks_count,
+                },
+            )
 
     cached["underlyings"].sort(
         key=lambda item: (
@@ -1024,6 +1134,10 @@ async def build_quick_payload(
             payload=copy.deepcopy(cached),
             full_scanned_at=full_scanned_at or now,
         )
+    message = f"Quick refresh complete: {refreshed_count}/{total_rows} quotes"
+    if errors:
+        message = f"{message}, {len(errors)} errors"
+    _finish_progress(key, success=True, message=message, contracts=total_contracts)
     return cached
 
 
