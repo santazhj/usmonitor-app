@@ -3,6 +3,7 @@ const els = {
   adminLink: document.querySelector("#adminLink"),
   languageToggle: document.querySelector("#languageToggle"),
   dashboardMetrics: document.querySelector("#dashboardMetrics"),
+  intelPanel: document.querySelector("#intelPanel"),
   categoryTabs: document.querySelector("#categoryTabs"),
   dashboardRows: document.querySelector("#dashboardRows"),
   sourceStatus: document.querySelector("#sourceStatus"),
@@ -111,6 +112,20 @@ const COPY = {
     "metrics.detail.core": "供应链核心约束层",
     "metrics.detail.attention": "高流动性或高关注标的",
     "metrics.detail.updated": "接口生成时间",
+    "intel.eyebrow": "AI Situation",
+    "intel.title": "AI 产业链态势屏",
+    "intel.summary": "基于行情、成交额和情报流生成的实时观察层。",
+    "intel.focus": "当前主线",
+    "intel.pressure": "压力点",
+    "intel.breadth": "行情覆盖",
+    "intel.map": "产业链热力地图",
+    "intel.movers": "异动标的",
+    "intel.avgChange": "平均涨跌",
+    "intel.volume": "成交额",
+    "intel.upDown": "上涨/下跌",
+    "intel.covered": "{priced}/{total} 有行情",
+    "intel.noData": "等待行情",
+    "intel.open": "查看",
     "dashboard.refreshTarget": "{seconds}s 刷新目标",
     "dashboard.rowsShown": "显示 {shown}/{total}，排序：{sort}",
     "dashboard.noRows": "没有匹配的标的。",
@@ -190,6 +205,20 @@ const COPY = {
     "metrics.detail.core": "Supply constraint layers",
     "metrics.detail.attention": "High-liquidity or high-attention names",
     "metrics.detail.updated": "API generation time",
+    "intel.eyebrow": "AI Situation",
+    "intel.title": "AI Supply-Chain Situation Screen",
+    "intel.summary": "A live operating layer generated from market data, dollar volume, and intelligence flow.",
+    "intel.focus": "Current Focus",
+    "intel.pressure": "Pressure Point",
+    "intel.breadth": "Price Coverage",
+    "intel.map": "Supply-Chain Heat Map",
+    "intel.movers": "Active Movers",
+    "intel.avgChange": "Avg Change",
+    "intel.volume": "$ Volume",
+    "intel.upDown": "Up/Down",
+    "intel.covered": "{priced}/{total} priced",
+    "intel.noData": "Waiting for market data",
+    "intel.open": "Open",
     "dashboard.refreshTarget": "{seconds}s refresh target",
     "dashboard.rowsShown": "Showing {shown}/{total}, sorted by {sort}",
     "dashboard.noRows": "No matching tickers.",
@@ -799,6 +828,147 @@ function currentRows() {
     });
 }
 
+function pricedDashboardRows() {
+  return (state.dashboard?.rows || []).filter((row) => Number.isFinite(Number(row.price)));
+}
+
+function categoryStats() {
+  const categories = state.dashboard?.categories || [];
+  const rows = state.dashboard?.rows || [];
+  const stats = categories.map((category) => {
+    const categoryRows = rows.filter((row) => row.category === category.slug);
+    const priced = categoryRows.filter((row) => Number.isFinite(Number(row.price)));
+    const changes = priced.map((row) => Number(row.change_percent)).filter(Number.isFinite);
+    const volume = priced.reduce((sum, row) => sum + (Number(row.dollar_volume) || 0), 0);
+    const avgChange = changes.length ? changes.reduce((sum, value) => sum + value, 0) / changes.length : null;
+    const up = changes.filter((value) => value > 0).length;
+    const down = changes.filter((value) => value < 0).length;
+    const leader = [...priced].sort((a, b) => (Number(b.dollar_volume) || 0) - (Number(a.dollar_volume) || 0))[0];
+    return {
+      slug: category.slug,
+      label: displayCategoryItem(category),
+      count: categoryRows.length,
+      priced: priced.length,
+      avgChange,
+      volume,
+      up,
+      down,
+      leader
+    };
+  });
+  const maxVolume = Math.max(...stats.map((item) => item.volume), 1);
+  return stats.map((item) => ({
+    ...item,
+    heat: Math.max(
+      12,
+      Math.min(100, (item.volume / maxVolume) * 68 + Math.min(32, Math.abs(item.avgChange || 0) * 3.2))
+    )
+  }));
+}
+
+function formatAvgChange(value) {
+  return value === null || value === undefined ? "--" : formatPercent(value);
+}
+
+function renderIntelPanel() {
+  if (!els.intelPanel) return;
+  if (state.dashboardError) {
+    els.intelPanel.innerHTML = "";
+    return;
+  }
+  const rows = state.dashboard?.rows || [];
+  const pricedRows = pricedDashboardRows();
+  const stats = categoryStats();
+  if (!rows.length) {
+    els.intelPanel.innerHTML = `
+      <article class="intel-command-card">
+        <span class="eyebrow">${escapeHtml(t("intel.eyebrow"))}</span>
+        <h2>${escapeHtml(t("intel.title"))}</h2>
+        <p>${escapeHtml(t("intel.noData"))}</p>
+      </article>`;
+    return;
+  }
+
+  const focus = [...stats].filter((item) => item.priced).sort((a, b) => b.volume - a.volume)[0];
+  const pressure = [...stats]
+    .filter((item) => item.avgChange !== null)
+    .sort((a, b) => (a.avgChange ?? 0) - (b.avgChange ?? 0))[0];
+  const total = rows.length;
+  const coverage = total ? Math.round((pricedRows.length / total) * 100) : 0;
+  const movers = [...pricedRows]
+    .filter((row) => Number.isFinite(Number(row.change_percent)))
+    .sort((a, b) => Math.abs(Number(b.change_percent)) - Math.abs(Number(a.change_percent)))
+    .slice(0, 5);
+
+  els.intelPanel.innerHTML = `
+    <article class="intel-command-card">
+      <span class="eyebrow">${escapeHtml(t("intel.eyebrow"))}</span>
+      <h2>${escapeHtml(t("intel.title"))}</h2>
+      <p>${escapeHtml(t("intel.summary"))}</p>
+      <div class="intel-signal-grid">
+        ${intelSignalBlock(t("intel.focus"), focus?.label || "--", focus ? `${formatAvgChange(focus.avgChange)} · ${formatCompact(focus.volume, "$")}` : "--", "focus")}
+        ${intelSignalBlock(t("intel.pressure"), pressure?.label || "--", pressure ? `${formatAvgChange(pressure.avgChange)} · ${pressure.up}/${pressure.down}` : "--", "pressure")}
+        ${intelSignalBlock(t("intel.breadth"), `${coverage}%`, t("intel.covered", { priced: pricedRows.length, total }), "breadth")}
+      </div>
+    </article>
+
+    <article class="intel-map-card">
+      <div class="intel-card-head">
+        <span>${escapeHtml(t("intel.map"))}</span>
+        <small>${escapeHtml(t("intel.avgChange"))}</small>
+      </div>
+      <div class="heat-map">
+        ${stats
+          .map((item) => {
+            const tone = (item.avgChange || 0) >= 0 ? "up" : "down";
+            const active = state.category === item.slug ? "active" : "";
+            const heatOpacity = (0.06 + item.heat / 580).toFixed(3);
+            return `
+              <button class="heat-node ${tone} ${active}" style="--heat:${item.heat.toFixed(0)}%; --heat-opacity:${heatOpacity}" data-intel-category="${escapeHtml(item.slug)}" type="button">
+                <span>${escapeHtml(item.label)}</span>
+                <strong>${escapeHtml(formatAvgChange(item.avgChange))}</strong>
+                <small>${escapeHtml(item.priced)}/${escapeHtml(item.count)} · ${escapeHtml(formatCompact(item.volume, "$"))}</small>
+                <i><b style="width:${item.heat.toFixed(0)}%"></b></i>
+              </button>`;
+          })
+          .join("")}
+      </div>
+    </article>
+
+    <article class="intel-movers-card">
+      <div class="intel-card-head">
+        <span>${escapeHtml(t("intel.movers"))}</span>
+        <small>${escapeHtml(t("intel.volume"))}</small>
+      </div>
+      <div class="mover-list">
+        ${movers
+          .map((row) => {
+            const change = Number(row.change_percent);
+            const tone = change >= 0 ? "up" : "down";
+            return `
+              <button class="mover-row ${tone}" data-intel-ticker="${escapeHtml(row.ticker)}" type="button">
+                <span>
+                  <strong>${escapeHtml(row.ticker)}</strong>
+                  <small>${escapeHtml(displayCompany(row))}</small>
+                </span>
+                <em>${escapeHtml(formatPercent(row.change_percent))}</em>
+                <b>${escapeHtml(formatCompact(row.dollar_volume, "$"))}</b>
+              </button>`;
+          })
+          .join("")}
+      </div>
+    </article>`;
+}
+
+function intelSignalBlock(label, value, detail, tone) {
+  return `
+    <section class="intel-signal ${escapeHtml(tone)}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </section>`;
+}
+
 function applyCopy() {
   document.documentElement.lang = state.language === "zh" ? "zh-Hans" : "en";
   document.querySelectorAll("[data-i18n]").forEach((element) => {
@@ -1004,6 +1174,7 @@ function renderAll() {
   applyCopy();
   renderStatus();
   renderMetrics();
+  renderIntelPanel();
   renderCategories();
   renderSources();
   renderTable();
@@ -1163,6 +1334,7 @@ function bindEvents() {
     if (!button) return;
     state.category = button.dataset.category;
     localStorage.setItem(CATEGORY_KEY, state.category);
+    renderIntelPanel();
     renderCategories();
     renderTable();
   });
@@ -1180,6 +1352,23 @@ function bindEvents() {
       localStorage.setItem(SORT_FIELD_KEY, state.sortField);
       localStorage.setItem(SORT_DIRECTION_KEY, state.sortDirection);
       renderTable();
+      return;
+    }
+
+    const intelCategory = event.target.closest("[data-intel-category]");
+    if (intelCategory) {
+      state.category = intelCategory.dataset.intelCategory;
+      localStorage.setItem(CATEGORY_KEY, state.category);
+      renderIntelPanel();
+      renderCategories();
+      renderTable();
+      return;
+    }
+
+    const intelTicker = event.target.closest("[data-intel-ticker]");
+    if (intelTicker) {
+      const row = (state.dashboard?.rows || []).find((item) => item.ticker === intelTicker.dataset.intelTicker);
+      if (row) openDrawer(row);
       return;
     }
 

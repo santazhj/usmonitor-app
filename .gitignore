@@ -13,6 +13,7 @@ serenity_alerts.db
 uvicorn.out.log
 uvicorn.err.log
 outputs/
+backups/
 docx_render_check/
 AI产业链瓶颈点深度报告.docx
 AI产业链瓶颈点深度报告.html
