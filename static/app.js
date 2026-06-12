@@ -100,6 +100,7 @@ const COPY = {
     "alerts.markRead": "标为已读",
     "alerts.save": "收藏",
     "alerts.unsave": "取消收藏",
+    "alerts.monitorSource": "监控源",
     "alerts.source": "原文",
     "tabs.all": "全部",
     "metrics.tracked": "标的数",
@@ -193,6 +194,7 @@ const COPY = {
     "alerts.markRead": "Mark read",
     "alerts.save": "Save",
     "alerts.unsave": "Unsave",
+    "alerts.monitorSource": "Monitor source",
     "alerts.source": "Source",
     "tabs.all": "All",
     "metrics.tracked": "Tickers",
@@ -523,6 +525,15 @@ function displaySourceText(value) {
       .replace("tickers.", "个标的。");
   }
   return ZH_SOURCE_LABELS[value] || value;
+}
+
+function displayMonitorSource(item) {
+  if (!item) return "";
+  const label = item.monitor_source_label ||
+    [item.monitor_name, item.source_label].filter(Boolean).join(" / ");
+  if (label) return label;
+  if (item.source_handle) return `@${String(item.source_handle).replace(/^@/, "")}`;
+  return "";
 }
 
 function t(key, params = {}) {
@@ -1163,12 +1174,17 @@ function renderFeed() {
       const read = state.readAlerts.has(item.id);
       const saved = state.savedAlerts.has(item.id);
       const tickers = (item.tickers || []).slice(0, 6);
+      const monitorSource = displayMonitorSource(item);
+      const monitorSourcePrefix = state.language === "zh"
+        ? `${t("alerts.monitorSource")}：`
+        : `${t("alerts.monitorSource")}: `;
       return `
         <article class="terminal-feed-card ${read ? "read" : ""}" data-alert-id="${escapeHtml(item.id)}">
           <div class="feed-card-head">
             <strong>${escapeHtml(item.title || "Untitled")}</strong>
             <time>${escapeHtml(formatDateTime(item.created_at))}</time>
           </div>
+          ${monitorSource ? `<div class="feed-source-meta"><span>${escapeHtml(monitorSourcePrefix)}${escapeHtml(monitorSource)}</span></div>` : ""}
           <p>${escapeHtml(item.notification_text || "")}</p>
           <div class="feed-tickers">
             ${tickers.map((ticker) => `<button type="button" data-feed-ticker="${escapeHtml(ticker)}">$${escapeHtml(ticker)}</button>`).join("")}

@@ -73,6 +73,11 @@ def test_public_feed_returns_active_monitor_list_summaries_without_login():
     assert len(result) == 1
     assert result[0]["title"] == "$SIVE 机构资金催化"
     assert result[0]["tickers"] == ["SIVE.ST"]
+    assert result[0]["monitor_name"] == "Serenity Alert"
+    assert result[0]["source_type"] == "x_user"
+    assert result[0]["source_handle"] == "aleabitoreddit"
+    assert result[0]["source_label"] == "X @aleabitoreddit"
+    assert result[0]["monitor_source_label"] == "Serenity Alert / X @aleabitoreddit"
 
 
 def test_public_lists_do_not_require_session_cookie():

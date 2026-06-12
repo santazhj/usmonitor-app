@@ -4061,6 +4061,24 @@ button:disabled {
   white-space: nowrap;
 }
 
+.feed-source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.feed-source-meta span {
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(52, 211, 153, 0.24);
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.07);
+  color: #a7f3d0;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .terminal-feed-card p {
   margin: 0;
   color: #d4d4d8;

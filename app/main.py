@@ -388,6 +388,45 @@ def revoke_membership(db: Session, user: User) -> None:
     db.commit()
 
 
+def summary_source_payload(summary: AlertSummary) -> dict:
+    monitor_list = summary.monitor_list
+    post = summary.post
+    source = post.source if post else None
+    source_type = source.source_type if source else ""
+    source_handle = (source.handle if source else "") or (
+        post.author_handle if post else ""
+    )
+    source_handle = source_handle.lstrip("@")
+    platform = (
+        "X"
+        if source_type == "x_user"
+        else source_type.replace("_", " ").title()
+    )
+    source_label = ""
+    if platform and source_handle:
+        source_label = (
+            f"{platform} @{source_handle}"
+            if platform == "X"
+            else f"{platform} {source_handle}"
+        )
+    elif source_handle:
+        source_label = f"@{source_handle}"
+
+    monitor_name = monitor_list.name if monitor_list else ""
+    monitor_slug = monitor_list.slug if monitor_list else ""
+    display_label = " / ".join(
+        part for part in [monitor_name, source_label] if part
+    )
+    return {
+        "monitor_name": monitor_name,
+        "monitor_slug": monitor_slug,
+        "source_type": source_type,
+        "source_handle": source_handle,
+        "source_label": source_label,
+        "monitor_source_label": display_label or source_label or monitor_name,
+    }
+
+
 def serialize_summary(summary: AlertSummary, localized: dict | None = None) -> dict:
     localized = localized or {}
     return {
@@ -402,6 +441,7 @@ def serialize_summary(summary: AlertSummary, localized: dict | None = None) -> d
         "model": summary.model,
         "created_at": summary.created_at.isoformat(),
         "disclaimer": "仅为情报摘要，不构成投资建议、收益承诺或个性化交易方案。",
+        **summary_source_payload(summary),
     }
 
 
