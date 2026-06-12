@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 
 from app.services.market_data import (
+    normalize_aggregate_candles,
     normalize_financials,
     normalize_snapshot,
     normalize_ticker_overview,
+    normalize_yahoo_candles,
     normalize_yahoo_chart,
     normalize_yahoo_quote,
     normalize_yahoo_quote_item,
@@ -64,6 +66,55 @@ def test_normalize_snapshot_marks_day_price_as_close():
 
     assert normalized["price"] == 219.51
     assert normalized["price_mode"] == "close"
+
+
+def test_normalize_aggregate_candles_extracts_ohlc_rows():
+    rows = normalize_aggregate_candles(
+        {
+            "ticker": "NVDA",
+            "results": [
+                {"t": 1778644800000, "o": 224.93, "h": 227.84, "l": 221.56, "c": 225.83, "v": 150405386},
+                {"t": 1778731200000, "o": 226.1, "h": 230.0, "l": 225.5, "c": 228.4, "v": 180782857},
+            ],
+        }
+    )
+
+    assert len(rows) == 2
+    assert rows[0]["timestamp"].startswith("2026-")
+    assert rows[0]["open"] == 224.93
+    assert rows[1]["close"] == 228.4
+
+
+def test_normalize_yahoo_candles_extracts_and_aggregates_yearly_rows():
+    payload = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [1704067200, 1706745600, 1735689600],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [10, 12, 20],
+                                "high": [14, 16, 24],
+                                "low": [9, 11, 19],
+                                "close": [13, 15, 23],
+                                "volume": [100, 200, 300],
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+    rows = normalize_yahoo_candles(payload, "year")
+
+    assert len(rows) == 2
+    assert rows[0]["open"] == 10
+    assert rows[0]["high"] == 16
+    assert rows[0]["low"] == 9
+    assert rows[0]["close"] == 15
+    assert rows[0]["volume"] == 300
 
 
 def test_normalize_ticker_overview_extracts_market_cap():

@@ -46,8 +46,19 @@ const state = {
   dashboard: null,
   dashboardError: "",
   feed: [],
-  user: null
+  user: null,
+  drawerTicker: "",
+  candlePeriod: "day",
+  candleRequestId: 0
 };
+
+const CANDLE_PERIODS = [
+  { key: "intraday", zh: "日内", en: "Intra" },
+  { key: "day", zh: "日K", en: "Day" },
+  { key: "week", zh: "周K", en: "Week" },
+  { key: "month", zh: "月K", en: "Month" },
+  { key: "year", zh: "年K", en: "Year" }
+];
 
 const COPY = {
   zh: {
@@ -114,6 +125,11 @@ const COPY = {
     "drawer.position": "产业链定位",
     "drawer.signal": "最新线索",
     "drawer.range": "日内区间",
+    "drawer.chart": "K 线图",
+    "chart.loading": "正在加载 K 线...",
+    "chart.empty": "暂无 K 线数据",
+    "chart.failed": "K 线加载失败",
+    "chart.candles": "{count} 根 K 线",
     "drawer.source": "查看来源",
     "drawer.noSource": "暂无来源",
     "sort.ticker": "标的",
@@ -188,6 +204,11 @@ const COPY = {
     "drawer.position": "Supply-chain Position",
     "drawer.signal": "Latest Signal",
     "drawer.range": "Daily Range",
+    "drawer.chart": "Candlestick Chart",
+    "chart.loading": "Loading candles...",
+    "chart.empty": "No candle data",
+    "chart.failed": "Candles failed to load",
+    "chart.candles": "{count} candles",
     "drawer.source": "View Source",
     "drawer.noSource": "No source",
     "sort.ticker": "Ticker",
@@ -582,6 +603,157 @@ function rowStatus(row) {
   return { key: "live", label: labels.live };
 }
 
+function candlePeriodLabel(periodKey) {
+  const period = CANDLE_PERIODS.find((item) => item.key === periodKey);
+  if (!period) return periodKey;
+  return state.language === "zh" ? period.zh : period.en;
+}
+
+function formatCandleTimestamp(value, period) {
+  const date = parseApiDate(value);
+  if (!date) return "--";
+  const locale = state.language === "zh" ? "zh-Hans" : "en-US";
+  if (period === "intraday") {
+    return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  }
+  if (period === "year") {
+    return date.toLocaleDateString(locale, { year: "numeric" });
+  }
+  return date.toLocaleDateString(locale, { month: "2-digit", day: "2-digit" });
+}
+
+function setCandleStatus(message, tone = "muted") {
+  const status = document.querySelector("#candleStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.tone = tone;
+  status.classList.remove("hidden");
+}
+
+async function loadCandles(ticker, period) {
+  state.candlePeriod = period;
+  const requestId = ++state.candleRequestId;
+  document.querySelectorAll("[data-candle-period]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.candlePeriod === period);
+  });
+  const meta = document.querySelector("#candleMeta");
+  if (meta) meta.textContent = candlePeriodLabel(period);
+  setCandleStatus(t("chart.loading"));
+
+  try {
+    const data = await api(`/api/market/candles/${encodeURIComponent(ticker)}?period=${encodeURIComponent(period)}`);
+    if (requestId !== state.candleRequestId || ticker !== state.drawerTicker) return;
+    renderCandleChart(data);
+  } catch {
+    if (requestId !== state.candleRequestId) return;
+    const canvas = document.querySelector("#candleChart");
+    if (canvas) {
+      const context = canvas.getContext("2d");
+      context?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    if (meta) meta.textContent = candlePeriodLabel(period);
+    setCandleStatus(t("chart.failed"), "warn");
+  }
+}
+
+function renderCandleChart(data) {
+  const rows = (data?.candles || []).filter((row) => (
+    Number.isFinite(Number(row.open))
+    && Number.isFinite(Number(row.high))
+    && Number.isFinite(Number(row.low))
+    && Number.isFinite(Number(row.close))
+  ));
+  const canvas = document.querySelector("#candleChart");
+  const meta = document.querySelector("#candleMeta");
+  if (meta) {
+    meta.textContent = rows.length
+      ? `${candlePeriodLabel(data.period)} · ${t("chart.candles", { count: rows.length })}`
+      : candlePeriodLabel(data.period);
+  }
+  if (!canvas || !rows.length) {
+    setCandleStatus(t("chart.empty"), "warn");
+    return;
+  }
+  drawCandles(canvas, rows, data.period);
+  document.querySelector("#candleStatus")?.classList.add("hidden");
+}
+
+function drawCandles(canvas, rows, period) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(320, Math.floor(rect.width));
+  const height = Math.max(220, Math.floor(rect.height));
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const margin = { top: 16, right: 16, bottom: 34, left: 58 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const highs = rows.map((row) => Number(row.high));
+  const lows = rows.map((row) => Number(row.low));
+  const maxPrice = Math.max(...highs);
+  const minPrice = Math.min(...lows);
+  const pricePadding = (maxPrice - minPrice || maxPrice || 1) * 0.08;
+  const topPrice = maxPrice + pricePadding;
+  const bottomPrice = minPrice - pricePadding;
+  const yFor = (price) => margin.top + ((topPrice - price) / (topPrice - bottomPrice)) * plotHeight;
+  const xFor = (index) => margin.left + (rows.length === 1 ? plotWidth / 2 : (index / (rows.length - 1)) * plotWidth);
+
+  ctx.font = "11px JetBrains Mono, Consolas, monospace";
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(244, 244, 245, 0.08)";
+  ctx.fillStyle = "rgba(161, 161, 170, 0.9)";
+  for (let index = 0; index <= 4; index += 1) {
+    const y = margin.top + (plotHeight / 4) * index;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, y);
+    ctx.lineTo(width - margin.right, y);
+    ctx.stroke();
+    const price = topPrice - ((topPrice - bottomPrice) / 4) * index;
+    ctx.fillText(formatNumber(price, 2), 8, y + 4);
+  }
+
+  const candleWidth = Math.max(2, Math.min(10, (plotWidth / rows.length) * 0.58));
+  rows.forEach((row, index) => {
+    const open = Number(row.open);
+    const high = Number(row.high);
+    const low = Number(row.low);
+    const close = Number(row.close);
+    const up = close >= open;
+    const color = up ? "#34d399" : "#fb7185";
+    const x = xFor(index);
+    const yHigh = yFor(high);
+    const yLow = yFor(low);
+    const yOpen = yFor(open);
+    const yClose = yFor(close);
+    const bodyTop = Math.min(yOpen, yClose);
+    const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, yHigh);
+    ctx.lineTo(x, yLow);
+    ctx.stroke();
+    ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+  });
+
+  ctx.fillStyle = "rgba(161, 161, 170, 0.85)";
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  ctx.fillText(formatCandleTimestamp(first.timestamp, period), margin.left, height - 10);
+  const lastLabel = formatCandleTimestamp(last.timestamp, period);
+  const lastWidth = ctx.measureText(lastLabel).width;
+  ctx.fillText(lastLabel, width - margin.right - lastWidth, height - 10);
+  ctx.fillStyle = "#e4e4e7";
+  const closeLabel = `C ${formatNumber(last.close, 2)}`;
+  const closeWidth = ctx.measureText(closeLabel).width;
+  ctx.fillText(closeLabel, width - margin.right - closeWidth, margin.top + 12);
+}
+
 function sortValue(row, field) {
   const value = row[field];
   if (field === "ticker" || field === "category_label") return String(value || "");
@@ -839,6 +1011,7 @@ function renderAll() {
 }
 
 function openDrawer(row) {
+  state.drawerTicker = row.ticker;
   const status = rowStatus(row);
   const low = Number(row.low);
   const high = Number(row.high);
@@ -879,12 +1052,29 @@ function openDrawer(row) {
         <span>H ${escapeHtml(formatNumber(row.high, 2))}</span>
       </div>
     </section>
+    <section class="drawer-section candle-section">
+      <div class="drawer-section-row">
+        <h3>${escapeHtml(t("drawer.chart"))}</h3>
+        <span id="candleMeta" class="candle-meta">--</span>
+      </div>
+      <div class="candle-periods">
+        ${CANDLE_PERIODS.map((period) => `
+          <button class="candle-period-btn ${state.candlePeriod === period.key ? "active" : ""}" data-candle-period="${escapeHtml(period.key)}" type="button">
+            ${escapeHtml(state.language === "zh" ? period.zh : period.en)}
+          </button>`).join("")}
+      </div>
+      <div class="candle-chart-wrap">
+        <canvas id="candleChart" class="candle-chart" aria-label="${escapeHtml(t("drawer.chart"))}"></canvas>
+        <div id="candleStatus" class="candle-status">${escapeHtml(t("chart.loading"))}</div>
+      </div>
+    </section>
     <section class="drawer-section drawer-actions">
       ${row.source_url ? `<a class="terminal-button" href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(t("drawer.source"))}</a>` : `<span class="muted">${escapeHtml(t("drawer.noSource"))}</span>`}
       <span class="muted">${escapeHtml(formatDateTime(row.market_updated_at))}</span>
     </section>`;
   els.tickerDrawer.classList.remove("hidden");
   els.tickerDrawer.setAttribute("aria-hidden", "false");
+  loadCandles(row.ticker, state.candlePeriod);
 }
 
 function metricBlock(label, value) {
@@ -892,6 +1082,8 @@ function metricBlock(label, value) {
 }
 
 function closeDrawer() {
+  state.drawerTicker = "";
+  state.candleRequestId += 1;
   els.tickerDrawer.classList.add("hidden");
   els.tickerDrawer.setAttribute("aria-hidden", "true");
 }
@@ -995,6 +1187,12 @@ function bindEvents() {
     if (rowEl) {
       const row = (state.dashboard?.rows || []).find((item) => item.ticker === rowEl.dataset.ticker);
       if (row) openDrawer(row);
+      return;
+    }
+
+    const candleButton = event.target.closest("[data-candle-period]");
+    if (candleButton && state.drawerTicker) {
+      loadCandles(state.drawerTicker, candleButton.dataset.candlePeriod);
       return;
     }
 

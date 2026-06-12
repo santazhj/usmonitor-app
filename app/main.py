@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import secrets
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -40,7 +41,7 @@ from app.services.dashboard import (
     mention_rows,
 )
 from app.services.feed_localization import localize_feed_for_zh
-from app.services.market_data import fetch_dashboard_market_data
+from app.services.market_data import fetch_dashboard_market_data, fetch_market_candles
 from app.services.payments import confirm_payment, get_or_create_pending_payment
 from app.services.push import send_push
 from app.services.seed import seed_defaults
@@ -623,6 +624,21 @@ async def dashboard(
     tickers = dashboard_tickers() + [item["ticker"] for item in dynamic_rows]
     market_data = await fetch_dashboard_market_data(settings, tickers)
     return get_dashboard_snapshot(market_data, dynamic_rows, mentions)
+
+
+@app.get("/api/market/candles/{ticker}")
+async def market_candles(
+    ticker: str,
+    period: str = "day",
+    settings: Settings = Depends(get_settings),
+):
+    normalized = ticker.strip().upper()
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,20}", normalized):
+        raise HTTPException(status_code=400, detail="Invalid ticker.")
+    try:
+        return await fetch_market_candles(settings, normalized, period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/analytics/event")

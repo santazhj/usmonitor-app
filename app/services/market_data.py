@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time, timezone
+from datetime import datetime, time as dt_time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -46,6 +46,51 @@ _yahoo_fundamentals_cache: dict[str, Any] = {
     "key": "",
     "expires_at": 0.0,
     "rows": {},
+}
+_candle_cache: dict[str, Any] = {}
+_candle_cache_lock = asyncio.Lock()
+
+CANDLE_PERIODS: dict[str, dict[str, Any]] = {
+    "intraday": {
+        "multiplier": 5,
+        "timespan": "minute",
+        "days": 5,
+        "limit": 500,
+        "yahoo_range": "1d",
+        "yahoo_interval": "5m",
+    },
+    "day": {
+        "multiplier": 1,
+        "timespan": "day",
+        "days": 365,
+        "limit": 500,
+        "yahoo_range": "1y",
+        "yahoo_interval": "1d",
+    },
+    "week": {
+        "multiplier": 1,
+        "timespan": "week",
+        "days": 365 * 3,
+        "limit": 500,
+        "yahoo_range": "5y",
+        "yahoo_interval": "1wk",
+    },
+    "month": {
+        "multiplier": 1,
+        "timespan": "month",
+        "days": 365 * 8,
+        "limit": 500,
+        "yahoo_range": "10y",
+        "yahoo_interval": "1mo",
+    },
+    "year": {
+        "multiplier": 1,
+        "timespan": "year",
+        "days": 365 * 20,
+        "limit": 500,
+        "yahoo_range": "max",
+        "yahoo_interval": "1mo",
+    },
 }
 
 # Last-resort low-frequency fundamentals for global watchlist names. These keep
@@ -296,6 +341,107 @@ def normalize_snapshot(snapshot: dict[str, Any], now_utc: datetime | None = None
         ),
         "provider": "Massive",
     }
+
+
+def normalize_aggregate_candles(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        return []
+    rows = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        opened = _number(item.get("o"))
+        high = _number(item.get("h"))
+        low = _number(item.get("l"))
+        close = _number(item.get("c"))
+        timestamp = item.get("t")
+        if opened is None or high is None or low is None or close is None or timestamp is None:
+            continue
+        try:
+            seconds = int(timestamp) / 1000
+        except (TypeError, ValueError):
+            continue
+        rows.append(
+            {
+                "timestamp": datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat(),
+                "open": opened,
+                "high": high,
+                "low": low,
+                "close": close,
+                "volume": _number(item.get("v")),
+                "vwap": _number(item.get("vw")),
+            }
+        )
+    return rows
+
+
+def _aggregate_yearly_candles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    buckets: dict[int, list[dict[str, Any]]] = {}
+    for row in rows:
+        parsed = _parse_iso_datetime(row.get("timestamp"))
+        if not parsed:
+            continue
+        buckets.setdefault(parsed.year, []).append(row)
+    yearly = []
+    for year in sorted(buckets):
+        items = buckets[year]
+        highs = [item["high"] for item in items if item.get("high") is not None]
+        lows = [item["low"] for item in items if item.get("low") is not None]
+        volumes = [item.get("volume") or 0 for item in items]
+        if not highs or not lows:
+            continue
+        yearly.append(
+            {
+                "timestamp": items[0]["timestamp"],
+                "open": items[0]["open"],
+                "high": max(highs),
+                "low": min(lows),
+                "close": items[-1]["close"],
+                "volume": sum(volumes) if volumes else None,
+                "vwap": None,
+            }
+        )
+    return yearly
+
+
+def normalize_yahoo_candles(payload: dict[str, Any], period: str) -> list[dict[str, Any]]:
+    chart = payload.get("chart") if isinstance(payload, dict) else None
+    results = chart.get("result") if isinstance(chart, dict) else None
+    if not isinstance(results, list) or not results:
+        return []
+    result = results[0]
+    timestamps = result.get("timestamp") if isinstance(result, dict) else None
+    indicators = result.get("indicators") if isinstance(result, dict) else {}
+    quote_list = indicators.get("quote") if isinstance(indicators, dict) else None
+    quote = quote_list[0] if isinstance(quote_list, list) and quote_list else {}
+    if not isinstance(timestamps, list) or not isinstance(quote, dict):
+        return []
+    rows = []
+    for index, timestamp in enumerate(timestamps):
+        try:
+            seconds = int(timestamp)
+        except (TypeError, ValueError):
+            continue
+        opened = _number((quote.get("open") or [None])[index] if index < len(quote.get("open") or []) else None)
+        high = _number((quote.get("high") or [None])[index] if index < len(quote.get("high") or []) else None)
+        low = _number((quote.get("low") or [None])[index] if index < len(quote.get("low") or []) else None)
+        close = _number((quote.get("close") or [None])[index] if index < len(quote.get("close") or []) else None)
+        if opened is None or high is None or low is None or close is None:
+            continue
+        volume_values = quote.get("volume") or []
+        rows.append(
+            {
+                "timestamp": datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat(),
+                "open": opened,
+                "high": high,
+                "low": low,
+                "close": close,
+                "volume": _number(volume_values[index]) if index < len(volume_values) else None,
+                "vwap": None,
+            }
+        )
+    return _aggregate_yearly_candles(rows) if period == "year" else rows
 
 
 def _field_value(block: dict[str, Any], field: str) -> float | int | None:
@@ -643,6 +789,112 @@ async def fetch_dashboard_market_data(
         )
 
     return massive
+
+
+async def fetch_market_candles(
+    settings: Settings,
+    ticker: str,
+    period: str,
+) -> dict[str, Any]:
+    ticker = ticker.strip().upper()
+    period = period.strip().lower()
+    if period not in CANDLE_PERIODS:
+        raise ValueError("Unsupported candle period.")
+
+    cache_key = f"{ticker}:{period}"
+    now = time.monotonic()
+    async with _candle_cache_lock:
+        cached = _candle_cache.get(cache_key)
+        if cached and float(cached.get("expires_at", 0)) > now:
+            return cached["payload"]
+
+    rows: list[dict[str, Any]] = []
+    source = ""
+    detail = ""
+    if settings.massive_api_key:
+        rows, detail = await _fetch_massive_candles(settings, ticker, period)
+        if rows:
+            source = "massive"
+
+    if not rows:
+        fallback_rows, fallback_detail = await _fetch_yahoo_candles(ticker, period)
+        if fallback_rows:
+            rows = fallback_rows
+            source = "fallback"
+            detail = fallback_detail
+        elif not detail:
+            detail = fallback_detail or "No candle data returned."
+
+    payload = {
+        "ticker": ticker,
+        "period": period,
+        "status": "ok" if rows else "empty",
+        "source": source,
+        "detail": detail,
+        "candles": rows,
+    }
+    ttl = 60 if period == "intraday" else 15 * 60
+    async with _candle_cache_lock:
+        _candle_cache[cache_key] = {"expires_at": now + ttl, "payload": payload}
+    return payload
+
+
+async def _fetch_massive_candles(
+    settings: Settings,
+    ticker: str,
+    period: str,
+) -> tuple[list[dict[str, Any]], str]:
+    config = CANDLE_PERIODS[period]
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=int(config["days"]))
+    base_url = _normalize_base_url(settings.massive_base_url)
+    try:
+        async with httpx.AsyncClient(base_url=base_url, timeout=20) as client:
+            response = await client.get(
+                f"/v2/aggs/ticker/{ticker}/range/{config['multiplier']}/{config['timespan']}/{start}/{end}",
+                params={
+                    "adjusted": "true",
+                    "sort": "asc",
+                    "limit": int(config["limit"]),
+                    "apiKey": settings.massive_api_key,
+                },
+            )
+            if response.status_code in {400, 403, 404}:
+                return [], f"Massive candles unavailable: HTTP {response.status_code}."
+            response.raise_for_status()
+            rows = normalize_aggregate_candles(response.json())
+            return rows, (
+                f"Massive returned {len(rows)} candles."
+                if rows
+                else "Massive returned no candles for this ticker/period."
+            )
+    except (httpx.HTTPError, ValueError) as exc:
+        return [], f"Massive candles request failed: {exc.__class__.__name__}."
+
+
+async def _fetch_yahoo_candles(ticker: str, period: str) -> tuple[list[dict[str, Any]], str]:
+    config = CANDLE_PERIODS[period]
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        async with httpx.AsyncClient(timeout=20, headers=headers) as client:
+            response = await client.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+                params={
+                    "range": config["yahoo_range"],
+                    "interval": config["yahoo_interval"],
+                    "includePrePost": "false",
+                },
+            )
+            if response.status_code != 200:
+                return [], f"Fallback candles unavailable: HTTP {response.status_code}."
+            rows = normalize_yahoo_candles(response.json(), period)
+            return rows, (
+                f"Fallback returned {len(rows)} candles."
+                if rows
+                else "No candle data returned."
+            )
+    except (httpx.HTTPError, ValueError) as exc:
+        return [], f"Fallback candles request failed: {exc.__class__.__name__}."
 
 
 async def fetch_yahoo_chart_market_data(
