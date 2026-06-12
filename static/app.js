@@ -547,15 +547,24 @@ function formatPercent(value) {
   return `${sign}${formatNumber(number, 2)}%`;
 }
 
+function parseApiDate(value) {
+  if (!value) return null;
+  const text = String(value);
+  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(text);
+  const normalized = hasTimezone ? text : `${text}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function formatDateTime(value) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
+  const date = parseApiDate(value);
+  if (!date) return "--";
   return date.toLocaleString(state.language === "zh" ? "zh-Hans" : "en-US", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
+    timeZoneName: "short"
   });
 }
 
@@ -566,7 +575,7 @@ function rowStatus(row) {
   if (!Number.isFinite(Number(row.price))) return { key: "missing", label: labels.missing };
   if (row.price_mode === "live") return { key: "live", label: labels.live };
   if (row.price_mode === "close") return { key: "stale", label: labels.close };
-  const updated = row.market_updated_at ? new Date(row.market_updated_at) : null;
+  const updated = parseApiDate(row.market_updated_at);
   if (updated && Date.now() - updated.getTime() > 1000 * 60 * 60 * 36) {
     return { key: "stale", label: labels.close };
   }

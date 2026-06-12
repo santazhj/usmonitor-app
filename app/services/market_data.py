@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time as dt_time, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -150,6 +151,18 @@ def _timestamp_to_iso(value: Any) -> str | None:
     return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
 
 
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _number(value: Any) -> float | int | None:
     if value in (None, ""):
         return None
@@ -193,7 +206,61 @@ def _price_mode(snapshot: dict[str, Any]) -> str:
     return "missing"
 
 
-def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+def _market_schedule(ticker: str | None, exchange: str | None) -> tuple[str, dt_time, dt_time] | None:
+    ticker = (ticker or "").upper()
+    exchange = (exchange or "").upper()
+    if ticker.endswith(".KS") or exchange in {"KSC", "KOE"}:
+        return ("Asia/Seoul", dt_time(9, 0), dt_time(15, 30))
+    if ticker.endswith(".T") or exchange in {"JPX", "JP", "JPN"}:
+        return ("Asia/Tokyo", dt_time(9, 0), dt_time(15, 30))
+    if ticker.endswith(".TW") or exchange in {"TAI", "TWO"}:
+        return ("Asia/Taipei", dt_time(9, 0), dt_time(13, 30))
+    if ticker.endswith(".AS") or exchange in {"AMS"}:
+        return ("Europe/Amsterdam", dt_time(9, 0), dt_time(17, 30))
+    if ticker.endswith(".PA") or exchange in {"PAR"}:
+        return ("Europe/Paris", dt_time(9, 0), dt_time(17, 30))
+    if ticker.endswith(".VI") or exchange in {"VIE"}:
+        return ("Europe/Vienna", dt_time(9, 0), dt_time(17, 30))
+    if ticker.endswith(".ST") or exchange in {"STO"}:
+        return ("Europe/Stockholm", dt_time(9, 0), dt_time(17, 30))
+    if ticker.endswith(".L") or exchange in {"LSE", "LSEIOB"}:
+        return ("Europe/London", dt_time(8, 0), dt_time(16, 30))
+    if ticker and "." not in ticker:
+        return ("America/New_York", dt_time(9, 30), dt_time(16, 0))
+    return None
+
+
+def _regular_session_price_mode(
+    ticker: str | None,
+    exchange: str | None,
+    updated_at: str | None,
+    now_utc: datetime | None = None,
+) -> str:
+    schedule = _market_schedule(ticker, exchange)
+    if not schedule:
+        return "close"
+    timezone_name, open_time, close_time = schedule
+    now = now_utc or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    market_tz = ZoneInfo(timezone_name)
+    local_now = now.astimezone(market_tz)
+    if local_now.weekday() >= 5:
+        return "close"
+    if not (open_time <= local_now.time() <= close_time):
+        return "close"
+    updated = _parse_iso_datetime(updated_at)
+    if updated:
+        local_updated = updated.astimezone(market_tz)
+        if local_updated.date() != local_now.date():
+            return "close"
+        if (now - updated).total_seconds() > 45 * 60:
+            return "close"
+    return "live"
+
+
+def normalize_snapshot(snapshot: dict[str, Any], now_utc: datetime | None = None) -> dict[str, Any]:
     ticker = snapshot.get("ticker")
     day = snapshot.get("day") or {}
     prev_day = snapshot.get("prevDay") or {}
@@ -207,6 +274,8 @@ def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         computed_dollar_volume = volume * (vwap or price)
         if dollar_volume is None or dollar_volume <= volume * 10:
             dollar_volume = computed_dollar_volume
+    updated_at = _timestamp_to_iso(snapshot.get("updated"))
+    raw_price_mode = _price_mode(snapshot)
     return {
         "ticker": ticker,
         "price": price,
@@ -219,8 +288,12 @@ def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "low": _number(day.get("l")),
         "close": _number(day.get("c")),
         "previous_close": _number(prev_day.get("c")),
-        "updated_at": _timestamp_to_iso(snapshot.get("updated")),
-        "price_mode": _price_mode(snapshot),
+        "updated_at": updated_at,
+        "price_mode": (
+            "missing"
+            if raw_price_mode == "missing"
+            else _regular_session_price_mode(ticker, None, updated_at, now_utc)
+        ),
         "provider": "Massive",
     }
 
@@ -285,7 +358,11 @@ def _previous_number(values: list[Any] | None) -> float | int | None:
     return None
 
 
-def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
+def normalize_yahoo_chart(
+    payload: dict[str, Any],
+    ticker: str,
+    now_utc: datetime | None = None,
+) -> dict[str, Any]:
     chart = payload.get("chart") if isinstance(payload, dict) else None
     results = chart.get("result") if isinstance(chart, dict) else None
     if not isinstance(results, list) or not results:
@@ -323,7 +400,13 @@ def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any
     if price is None:
         return {}
     market_state = str(meta.get("marketState") or "").upper()
-    price_mode = "live" if market_state in {"REGULAR", "PRE", "POST"} else "close"
+    exchange = meta.get("exchangeName")
+    if market_state == "REGULAR":
+        price_mode = "live"
+    elif market_state in {"PRE", "POST", "POSTPOST", "PREPRE", "CLOSED"}:
+        price_mode = "close"
+    else:
+        price_mode = _regular_session_price_mode(ticker, exchange, updated_at, now_utc)
 
     return {
         "ticker": ticker,
@@ -339,7 +422,7 @@ def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any
         "previous_close": previous_close,
         "updated_at": updated_at,
         "currency": meta.get("currency"),
-        "exchange": meta.get("exchangeName"),
+        "exchange": exchange,
         "price_mode": price_mode,
         "provider": "Yahoo Chart",
     }

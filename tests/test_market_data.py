@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.services.market_data import (
     normalize_financials,
     normalize_snapshot,
@@ -24,7 +26,7 @@ def test_normalize_snapshot_prefers_last_trade_price():
             "ticker": "NVDA",
             "todaysChangePerc": -2.5,
             "todaysChange": -5.2,
-            "updated": 1779494398645461153,
+            "updated": 1779458400000000000,
             "day": {
                 "v": 169339208,
                 "dv": "169339208.6",
@@ -36,7 +38,8 @@ def test_normalize_snapshot_prefers_last_trade_price():
             "lastTrade": {"p": 214.2801},
             "min": {"c": 214.25},
             "prevDay": {"c": 219.51},
-        }
+        },
+        now_utc=datetime(2026, 5, 22, 14, 15, tzinfo=timezone.utc),
     )
 
     assert normalized["ticker"] == "NVDA"
@@ -54,7 +57,9 @@ def test_normalize_snapshot_marks_day_price_as_close():
             "ticker": "NVDA",
             "day": {"c": 219.51},
             "prevDay": {"c": 214.28},
-        }
+            "updated": 1779483600000000000,
+        },
+        now_utc=datetime(2026, 5, 22, 21, 0, tzinfo=timezone.utc),
     )
 
     assert normalized["price"] == 219.51
@@ -128,6 +133,7 @@ def test_normalize_yahoo_chart_extracts_global_quote():
             }
         },
         "2802.T",
+        now_utc=datetime(2026, 5, 22, 14, 15, tzinfo=timezone.utc),
     )
 
     assert normalized["ticker"] == "2802.T"
@@ -138,6 +144,38 @@ def test_normalize_yahoo_chart_extracts_global_quote():
     assert normalized["currency"] == "JPY"
     assert normalized["provider"] == "Yahoo Chart"
     assert normalized["price_mode"] == "close"
+
+
+def test_normalize_yahoo_chart_marks_korea_regular_session_live():
+    normalized = normalize_yahoo_chart(
+        {
+            "chart": {
+                "result": [
+                    {
+                        "meta": {
+                            "currency": "KRW",
+                            "exchangeName": "KSC",
+                            "regularMarketPrice": 332500,
+                            "chartPreviousClose": 299000,
+                            "regularMarketTime": 1781242200,
+                        },
+                        "indicators": {
+                            "quote": [
+                                {
+                                    "close": [332500],
+                                    "volume": [22615241],
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        },
+        "005930.KS",
+        now_utc=datetime(2026, 6, 12, 5, 45, tzinfo=timezone.utc),
+    )
+
+    assert normalized["price_mode"] == "live"
 
 
 def test_normalize_yahoo_quote_item_extracts_low_frequency_fundamentals():
