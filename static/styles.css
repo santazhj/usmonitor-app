@@ -3336,8 +3336,8 @@ button:disabled {
 
 .terminal-layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 360px;
-  gap: 14px;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: 12px;
   margin-top: 14px;
   align-items: start;
 }
@@ -3491,24 +3491,39 @@ button:disabled {
 }
 
 .terminal-table-scroll {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: 72vh;
 }
 
 .terminal-table {
-  min-width: 1120px;
+  width: 100%;
+  min-width: 0;
 }
 
 .terminal-table-row {
   display: grid;
-  grid-template-columns: 150px 92px 92px 112px 112px 76px 150px minmax(260px, 1fr) 110px;
+  grid-template-columns:
+    minmax(108px, 1.15fr)
+    minmax(72px, 0.72fr)
+    minmax(68px, 0.64fr)
+    minmax(84px, 0.82fr)
+    minmax(88px, 0.9fr)
+    minmax(48px, 0.48fr)
+    minmax(96px, 0.82fr)
+    minmax(148px, 1.35fr)
+    minmax(54px, 0.54fr);
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-height: 56px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-bottom: 1px solid rgba(244, 244, 245, 0.07);
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
+}
+
+.terminal-table-row > * {
+  min-width: 0;
 }
 
 .terminal-table-head {
@@ -3524,12 +3539,26 @@ button:disabled {
 
 .terminal-table-head button,
 .terminal-table-head span {
+  display: block;
+  width: 100%;
   border: 0;
   padding: 0;
   background: transparent;
   color: inherit;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
+}
+
+.terminal-table-head span {
+  cursor: default;
+}
+
+.terminal-table-head button:nth-child(n + 2):nth-child(-n + 6),
+.terminal-table-head span:nth-child(n + 2):nth-child(-n + 6) {
+  text-align: right;
 }
 
 .terminal-table-head button.active {
@@ -3555,14 +3584,12 @@ button:disabled {
 }
 
 .sticky-col {
-  position: sticky;
-  left: 0;
-  z-index: 8;
-  background: rgba(15, 15, 17, 0.98);
+  position: static;
+  z-index: auto;
+  background: transparent;
 }
 
 .terminal-data-row .sticky-col {
-  align-self: stretch;
   display: grid;
   align-content: center;
 }
@@ -3575,6 +3602,9 @@ button:disabled {
 .ticker-cell strong {
   color: var(--terminal-text);
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ticker-cell small,
@@ -3586,6 +3616,7 @@ button:disabled {
 }
 
 .number-cell {
+  width: 100%;
   text-align: right;
   color: #e4e4e7;
 }
@@ -3602,7 +3633,7 @@ button:disabled {
 .data-badge {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
+  max-width: 100%;
   border-radius: 999px;
   padding: 4px 8px;
   border: 1px solid var(--terminal-border);
@@ -3610,6 +3641,9 @@ button:disabled {
   color: #d4d4d8;
   font-family: inherit;
   font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .data-badge.live {
@@ -3636,10 +3670,17 @@ button:disabled {
   gap: 4px;
 }
 
+.source-cell {
+  justify-items: start;
+}
+
 .role-cell strong {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: 12px;
   color: #e4e4e7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .role-cell small {
@@ -3935,9 +3976,15 @@ body:not(.terminal-page) .panel h2,
   color: #f4f4f5;
 }
 
+@media (max-width: 1500px) {
+  .terminal-layout {
+    grid-template-columns: 220px minmax(0, 1fr) 280px;
+  }
+}
+
 @media (max-width: 1280px) {
   .terminal-layout {
-    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 
   .terminal-alerts {

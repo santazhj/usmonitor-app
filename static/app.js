@@ -200,6 +200,281 @@ const COPY = {
   }
 };
 
+const ZH_CATEGORY_LABELS = {
+  all: "全部",
+  capex: "云资本开支",
+  "compute-network": "算力与网络",
+  "foundry-test": "晶圆制造与测试",
+  "memory-storage": "存储",
+  "packaging-substrate": "封装与基板",
+  optical: "光通信与光子",
+  "power-cooling": "电力与冷却",
+  "software-data": "软件与数据",
+  "serenity-alert": "Serenity 新增",
+  "Cloud CAPEX": "云资本开支",
+  "Compute & Network": "算力与网络",
+  "Foundry & Test": "晶圆制造与测试",
+  "Memory & Storage": "存储",
+  "Packaging & Substrate": "封装与基板",
+  "Optical & Photonics": "光通信与光子",
+  "Power & Cooling": "电力与冷却",
+  "Software & Data": "软件与数据",
+  "Serenity Adds": "Serenity 新增"
+};
+
+const ZH_LAYER_LABELS = {
+  "Cloud CAPEX": "云资本开支",
+  "Cloud/TPU": "云/TPU",
+  "Cloud/ASIC": "云/ASIC",
+  "AI Factory": "AI 工厂",
+  "GPU Cloud": "GPU 云",
+  "AI Cloud": "AI 云",
+  "GPU/Networking": "GPU/网络",
+  "GPU/CPU": "GPU/CPU",
+  "Custom ASIC/Networking": "定制 ASIC/网络",
+  "Custom Silicon/Optics": "定制芯片/光通信",
+  "AI Ethernet": "AI 以太网",
+  "PCIe/CXL": "PCIe/CXL",
+  "AEC/SerDes": "AEC/SerDes",
+  "AI Servers": "AI 服务器",
+  "Foundry/CoWoS": "晶圆代工/CoWoS",
+  EUV: "EUV 光刻",
+  Equipment: "半导体设备",
+  "Inspection/Metrology": "检测/量测",
+  "AI Chip Test": "AI 芯片测试",
+  "Hybrid Bonding": "混合键合",
+  "HBM/DRAM/eSSD": "HBM/DRAM/eSSD",
+  HBM: "HBM",
+  "HBM/DRAM/Foundry": "HBM/DRAM/代工",
+  "NAND/eSSD": "NAND/eSSD",
+  "NAND Controllers": "NAND 控制器",
+  "Korea Memory Basket": "韩国存储组合",
+  "ABF Substrate": "ABF 基板",
+  "ABF/PCB": "ABF/PCB",
+  "ABF Film": "ABF 膜",
+  "IC Substrate": "IC 基板",
+  "Wafer-Level Test": "晶圆级测试",
+  "Lasers/Transceivers": "激光器/收发器",
+  "Lasers/Optical Components": "激光器/光组件",
+  "Optical Manufacturing": "光模块制造",
+  "Fiber/Advanced Optics": "光纤/先进光学",
+  "Optical Modules": "光模块",
+  "InP/GaAs Substrates": "InP/GaAs 基板",
+  "DFB Laser/CPO": "DFB 激光器/CPO",
+  "SOI Substrate": "SOI 基板",
+  Epitaxy: "外延",
+  "Specialty Foundry": "特色工艺代工",
+  "Power/Thermal": "电力/热管理",
+  "Electrical Equipment": "电气设备",
+  "Power Management": "电力管理",
+  "Electrical Enclosures": "电气保护/机柜",
+  "Thermal Management": "热管理",
+  "Onsite Power": "现场供电",
+  "Clean Power": "清洁电力",
+  "Grid/Power": "电网/电力",
+  "Grid Buildout": "电网建设",
+  "Utilities Basket": "公用事业组合",
+  "AI Platform": "AI 平台",
+  "Data Cloud": "数据云",
+  Observability: "可观测性",
+  Security: "安全",
+  "Data/Attention": "数据/注意力",
+  "Design Software": "设计软件",
+  "Serenity Alert": "Serenity 新增"
+};
+
+const ZH_COMPANY_BY_TICKER = {
+  "000660.KS": "SK 海力士",
+  "005930.KS": "三星电子",
+  "2802.T": "味之素",
+  "3037.TW": "欣兴电子",
+  "4062.T": "揖斐电",
+  "6857.T": "爱德万测试",
+  AAOI: "应用光电",
+  AEHR: "Aehr 测试系统",
+  ALAB: "Astera Labs",
+  AMAT: "应用材料",
+  AMD: "AMD",
+  AMZN: "亚马逊",
+  ANET: "Arista 网络",
+  ASML: "阿斯麦",
+  "ATS.VI": "奥特斯",
+  AVGO: "博通",
+  AXTI: "AXT",
+  BE: "Bloom Energy",
+  "BESI.AS": "BESI",
+  CEG: "星座能源",
+  COHR: "相干公司",
+  CRDO: "Credo 科技",
+  CRWD: "CrowdStrike",
+  DDOG: "Datadog",
+  DELL: "戴尔科技",
+  ETN: "伊顿",
+  EWY: "韩国 MSCI ETF",
+  FIG: "Figma",
+  FN: "Fabrinet",
+  GEV: "GE Vernova",
+  GLW: "康宁",
+  GOOGL: "Alphabet/谷歌",
+  IQE: "IQE",
+  "IQE.L": "IQE",
+  KLAC: "科磊",
+  LITE: "Lumentum",
+  LRCX: "泛林集团",
+  META: "Meta",
+  MOD: "Modine 制造",
+  MRVL: "Marvell",
+  MSFT: "微软",
+  MU: "美光",
+  NBIS: "Nebius",
+  NVDA: "英伟达",
+  NVT: "nVent",
+  ORCL: "甲骨文",
+  PLTR: "Palantir",
+  PWR: "Quanta Services",
+  RDDT: "Reddit",
+  SIMO: "慧荣科技",
+  SMCI: "超微电脑",
+  SNDK: "闪迪",
+  "SIVE.ST": "Sivers Semiconductors",
+  SNOW: "Snowflake",
+  "SOI.PA": "Soitec",
+  "SU.PA": "施耐德电气",
+  TSEM: "Tower Semiconductor",
+  TSM: "台积电",
+  VRT: "维谛技术",
+  XLU: "公用事业 ETF"
+};
+
+const ZH_ROLE_LABELS = {
+  "Azure AI demand anchor": "Azure AI 需求锚点",
+  "TPU, Google Cloud, and internal model infrastructure": "TPU、Google Cloud 与内部模型基础设施",
+  "AWS, Trainium, and hyperscale infrastructure demand": "AWS、Trainium 与超大规模基建需求",
+  "Large AI infrastructure spender": "大型 AI 基建投入方",
+  "AI cloud capacity and GPU infrastructure supplier": "AI 云容量与 GPU 基建设施供应商",
+  "High-beta AI cloud capacity provider": "高弹性 AI 云算力供应商",
+  "AI rack-scale platform reference asset": "AI 整机柜平台标杆",
+  "Alternative accelerator and server CPU supplier": "替代加速器与服务器 CPU 供应商",
+  "Core beneficiary of hyperscaler custom silicon": "超大规模定制芯片核心受益方",
+  "Custom silicon, DSP, and electro-optics bridge": "定制芯片、DSP 与电光互联桥梁",
+  "Cloud AI spine/leaf switching supplier": "云端 AI 交换机供应商",
+  "AI server retimer and rack connectivity exposure": "AI 服务器 Retimer 与机柜互联标的",
+  "High-speed connectivity and active electrical cable exposure": "高速互联与 AEC 标的",
+  "Rack-scale AI server integration proxy": "AI 整机柜服务器集成代表",
+  "Enterprise AI server channel": "企业 AI 服务器渠道",
+  "Systemic chokepoint for AI accelerators and advanced packaging": "AI 加速器与先进封装系统级瓶颈",
+  "Upstream chokepoint for advanced logic and DRAM EUV": "先进逻辑与 DRAM EUV 上游瓶颈",
+  "Deposition, etch, and packaging equipment exposure": "沉积、刻蚀与封装设备标的",
+  "Etch/deposition exposure to memory and advanced nodes": "存储与先进制程刻蚀/沉积标的",
+  "Yield-control beneficiary for advanced nodes and packaging": "先进制程与封装良率控制受益方",
+  "SoC, HBM, and AI accelerator testing bottleneck": "SoC、HBM 与 AI 加速器测试瓶颈",
+  "High-beta hybrid bonding equipment exposure": "高弹性混合键合设备标的",
+  "US-listed core HBM and AI memory exposure": "美股核心 HBM 与 AI 存储标的",
+  "Leading HBM supplier with strong financial validation": "财务验证较强的 HBM 龙头",
+  "HBM catch-up and memory-cycle reference asset": "HBM 追赶与存储周期代表",
+  "AI storage and NAND-cycle leverage": "AI 存储与 NAND 周期弹性",
+  "Controller exposure to SSD and embedded storage demand": "SSD 与嵌入式存储控制器标的",
+  "Liquid proxy for SK hynix and Samsung exposure": "SK 海力士与三星的流动性代理",
+  "High-end IC substrate exposure for AI GPU/ASIC packages": "AI GPU/ASIC 高端 IC 基板标的",
+  "AI server PCB and high-layer substrate exposure": "AI 服务器 PCB 与高层板标的",
+  "Hidden material bottleneck in high-end substrates": "高端基板隐性材料瓶颈",
+  "High-beta substrate and advanced PCB supplier": "高弹性基板与先进 PCB 供应商",
+  "Small-cap test exposure to SiC, GaN, and photonics": "SiC、GaN 与光子测试小盘标的",
+  "Institutional optical-chain asset": "机构级光通信链标的",
+  "Laser and optical component exposure to AI datacom": "AI 数据通信激光与光组件标的",
+  "Optical module manufacturing capacity proxy": "光模块制造产能代理",
+  "Large-cap optical material reference asset": "大盘光学材料代表",
+  "High-attention AI optics beta": "高关注 AI 光通信弹性标的",
+  "Serenity-style bottom-layer photonics material exposure": "底层光子材料标的",
+  "Small-cap LRO/CPO light-source exposure": "LRO/CPO 光源小盘标的",
+  "Silicon photonics and SOI material exposure": "硅光与 SOI 材料标的",
+  "Compound semiconductor epitaxy exposure": "化合物半导体外延标的",
+  "Analog and silicon photonics foundry exposure": "模拟与硅光代工标的",
+  "Direct AI data-center power and cooling bottleneck": "AI 数据中心电力与冷却直接瓶颈",
+  "Switchgear, transformer, and power distribution exposure": "开关设备、变压器与配电标的",
+  "European core data-center electrification asset": "欧洲数据中心电气化核心标的",
+  "Electrical protection and enclosure content exposure": "电气保护与机柜内容标的",
+  "Liquid cooling and heat rejection high-beta exposure": "液冷与散热高弹性标的",
+  "Fuel-cell and onsite power optionality for data centers": "数据中心燃料电池与现场供电期权",
+  "Large-scale power supplier for data-center demand": "数据中心需求的大型电力供应商",
+  "Grid equipment and electrification backlog proxy": "电网设备与电气化订单代理",
+  "Transmission and power infrastructure construction proxy": "输电与电力基础设施建设代理",
+  "Liquid ETF proxy for AI power theme": "AI 电力主题流动性 ETF 代理",
+  "Enterprise AI workflow and government AI exposure": "企业 AI 工作流与政府 AI 标的",
+  "Enterprise data platform feeding AI workloads": "支撑 AI 工作负载的企业数据平台",
+  "Cloud and AI workload observability exposure": "云与 AI 工作负载可观测性标的",
+  "AI-era endpoint and cloud security platform": "AI 时代终端与云安全平台",
+  "High-attention data licensing and social platform asset": "高关注数据授权与社交平台标的",
+  "Product design collaboration and AI workflow exposure": "产品设计协作与 AI 工作流标的",
+  "Positive source mention": "正向来源提及"
+};
+
+function zhLookup(value, dictionary) {
+  if (state.language !== "zh" || !value) return value || "";
+  return dictionary[value] || value;
+}
+
+function displayCompany(row) {
+  if (state.language !== "zh") return row.company || "";
+  return ZH_COMPANY_BY_TICKER[row.ticker] || row.company || "";
+}
+
+function displayLayer(row) {
+  const category = ZH_CATEGORY_LABELS[row.category] || ZH_CATEGORY_LABELS[row.category_label];
+  if (state.language === "zh" && category) return category;
+  return row.category_label || row.ai_layer || "--";
+}
+
+function displayAiLayer(row) {
+  return zhLookup(row.ai_layer, ZH_LAYER_LABELS) || "--";
+}
+
+function displayRole(row) {
+  return zhLookup(row.role, ZH_ROLE_LABELS) || "--";
+}
+
+function displayCategoryItem(item) {
+  if (state.language !== "zh") return item.label;
+  return ZH_CATEGORY_LABELS[item.slug] || ZH_CATEGORY_LABELS[item.label] || item.label;
+}
+
+const ZH_SOURCE_LABELS = {
+  "Serenity Alert": "Serenity 情报",
+  "AI chokepoint map": "AI 瓶颈图谱",
+  "Market data": "行情数据",
+  Fundamentals: "基本面",
+  live: "在线",
+  pending: "等待",
+  error: "异常",
+  "X original-post monitor is deployed.": "X 原始帖监控已部署。",
+  "Dashboard taxonomy is seeded from the AI supply-chain report.": "产业链分层来自 AI 供应链图谱。",
+  "Provider adapter is not connected yet.": "行情适配器等待连接。"
+};
+
+function displaySourceText(value) {
+  if (state.language !== "zh" || !value) return value || "";
+  if (value.startsWith("Massive full-market snapshot connected.")) {
+    return value
+      .replace("Massive full-market snapshot connected.", "全市场行情已连接。")
+      .replace("U.S. tickers populated.", "个美股标的有行情。")
+      .replace("Fundamentals populated for", "基本面覆盖")
+      .replace("priced tickers.", "个有行情标的。")
+      .replace("Yahoo Chart fallback populated", "全球补充行情覆盖")
+      .replace("missing/global tickers.", "个缺失/全球标的。")
+      .replace("Yahoo Quote fundamentals populated", "补充基本面覆盖")
+      .replace("market-cap/PE rows.", "行市值/PE。")
+      .replaceAll("Massive", "行情源")
+      .replaceAll("Yahoo Chart", "补充行情")
+      .replaceAll("Yahoo Quote", "补充基本面");
+  }
+  if (value.startsWith("Low-frequency market cap and PE cache populated for")) {
+    return value
+      .replace("Low-frequency market cap and PE cache populated for", "低频市值和 PE 缓存已覆盖")
+      .replace("tickers.", "个标的。");
+  }
+  return ZH_SOURCE_LABELS[value] || value;
+}
+
 function t(key, params = {}) {
   let value = COPY[state.language]?.[key] || COPY.zh[key] || key;
   Object.entries(params).forEach(([name, replacement]) => {
@@ -285,12 +560,17 @@ function formatDateTime(value) {
 }
 
 function rowStatus(row) {
-  if (!Number.isFinite(Number(row.price))) return { key: "missing", label: t("row.missing") };
+  const labels = state.language === "zh"
+    ? { live: "实时", close: "收盘", missing: "缺失" }
+    : { live: "Live", close: "Close", missing: "Missing" };
+  if (!Number.isFinite(Number(row.price))) return { key: "missing", label: labels.missing };
+  if (row.price_mode === "live") return { key: "live", label: labels.live };
+  if (row.price_mode === "close") return { key: "stale", label: labels.close };
   const updated = row.market_updated_at ? new Date(row.market_updated_at) : null;
   if (updated && Date.now() - updated.getTime() > 1000 * 60 * 60 * 36) {
-    return { key: "stale", label: t("row.stale") };
+    return { key: "stale", label: labels.close };
   }
-  return { key: "live", label: t("row.live") };
+  return { key: "live", label: labels.live };
 }
 
 function sortValue(row, field) {
@@ -319,7 +599,11 @@ function currentRows() {
         row.category_label,
         row.ai_layer,
         row.role,
-        row.latest_signal
+        row.latest_signal,
+        displayCompany(row),
+        displayLayer(row),
+        displayAiLayer(row),
+        displayRole(row)
       ]
         .join(" ")
         .toLowerCase()
@@ -408,7 +692,7 @@ function renderCategories() {
     .map(
       (item) => `
         <button class="${state.category === item.slug ? "active" : ""}" data-category="${escapeHtml(item.slug)}" type="button">
-          <span>${escapeHtml(item.label)}</span>
+          <span>${escapeHtml(displayCategoryItem(item))}</span>
           <strong>${escapeHtml(item.count ?? "")}</strong>
         </button>`
     )
@@ -421,9 +705,9 @@ function renderSources() {
     .map(
       (item) => `
         <article class="terminal-source ${escapeHtml(item.status || "pending")}">
-          <span>${escapeHtml(item.name)}</span>
-          <strong>${escapeHtml(item.status || "pending")}</strong>
-          <small>${escapeHtml(item.detail || "")}</small>
+          <span>${escapeHtml(displaySourceText(item.name))}</span>
+          <strong>${escapeHtml(displaySourceText(item.status || "pending"))}</strong>
+          <small>${escapeHtml(displaySourceText(item.detail || ""))}</small>
         </article>`
     )
     .join("");
@@ -465,21 +749,19 @@ function renderTable() {
           <article class="terminal-table-row terminal-data-row" role="row" tabindex="0" data-ticker="${escapeHtml(row.ticker)}">
             <div class="ticker-cell sticky-col">
               <strong>${escapeHtml(row.ticker)}</strong>
-              <small>${escapeHtml(row.company || "")}</small>
+              <small>${escapeHtml(displayCompany(row))}</small>
             </div>
             <div class="number-cell">${escapeHtml(formatNumber(row.price, 2))}</div>
             <div class="number-cell ${tone}">${escapeHtml(formatPercent(row.change_percent))}</div>
             <div class="number-cell">${escapeHtml(formatCompact(row.dollar_volume, "$"))}</div>
             <div class="number-cell">${escapeHtml(formatCompact(row.market_cap, "$"))}</div>
             <div class="number-cell">${escapeHtml(row.pe_note || formatNumber(row.pe_ratio, 1))}</div>
-            <div><span class="soft-badge">${escapeHtml(row.category_label || row.ai_layer || "--")}</span></div>
+            <div><span class="soft-badge">${escapeHtml(displayLayer(row))}</span></div>
             <div class="role-cell">
-              <strong>${escapeHtml(row.role || "--")}</strong>
-              <small>${escapeHtml(row.latest_signal || "")}</small>
+              <strong>${escapeHtml(displayRole(row))}</strong>
             </div>
             <div class="source-cell">
               <span class="data-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
-              <small>${escapeHtml(row.market_provider || row.fundamentals_provider || "--")}</small>
             </div>
           </article>`;
       })
@@ -558,8 +840,8 @@ function openDrawer(row) {
   els.drawerBody.innerHTML = `
     <div class="drawer-title">
       <div>
-        <span class="eyebrow">${escapeHtml(row.category_label || row.ai_layer || "")}</span>
-        <h2 id="drawerTitle">${escapeHtml(row.ticker)} <small>${escapeHtml(row.company || "")}</small></h2>
+        <span class="eyebrow">${escapeHtml(displayAiLayer(row))}</span>
+        <h2 id="drawerTitle">${escapeHtml(row.ticker)} <small>${escapeHtml(displayCompany(row))}</small></h2>
       </div>
       <span class="data-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
     </div>
@@ -569,11 +851,11 @@ function openDrawer(row) {
       ${metricBlock(t("table.marketCap"), formatCompact(row.market_cap, "$"))}
       ${metricBlock(t("table.pe"), row.pe_note || formatNumber(row.pe_ratio, 1))}
       ${metricBlock(t("table.dollarVolume"), formatCompact(row.dollar_volume, "$"))}
-      ${metricBlock(t("table.source"), row.market_provider || row.fundamentals_provider || "--")}
+      ${metricBlock(t("table.source"), status.label)}
     </div>
     <section class="drawer-section">
       <h3>${escapeHtml(t("drawer.position"))}</h3>
-      <p>${escapeHtml(row.role || "--")}</p>
+      <p>${escapeHtml(displayRole(row))}</p>
       <small>${escapeHtml(row.focus || "")} · ${escapeHtml(row.tier || "")}</small>
     </section>
     <section class="drawer-section">

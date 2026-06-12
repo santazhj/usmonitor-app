@@ -45,6 +45,20 @@ def test_normalize_snapshot_prefers_last_trade_price():
     assert normalized["volume"] == 169339208
     assert normalized["dollar_volume"] == 169339208 * 216.8426
     assert normalized["updated_at"].startswith("2026-")
+    assert normalized["price_mode"] == "live"
+
+
+def test_normalize_snapshot_marks_day_price_as_close():
+    normalized = normalize_snapshot(
+        {
+            "ticker": "NVDA",
+            "day": {"c": 219.51},
+            "prevDay": {"c": 214.28},
+        }
+    )
+
+    assert normalized["price"] == 219.51
+    assert normalized["price_mode"] == "close"
 
 
 def test_normalize_ticker_overview_extracts_market_cap():
@@ -123,6 +137,7 @@ def test_normalize_yahoo_chart_extracts_global_quote():
     assert normalized["dollar_volume"] == 3827500 * 5300
     assert normalized["currency"] == "JPY"
     assert normalized["provider"] == "Yahoo Chart"
+    assert normalized["price_mode"] == "close"
 
 
 def test_normalize_yahoo_quote_item_extracts_low_frequency_fundamentals():

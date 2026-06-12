@@ -178,6 +178,21 @@ def _price(snapshot: dict[str, Any]) -> float | int | None:
     return None
 
 
+def _price_mode(snapshot: dict[str, Any]) -> str:
+    for path, mode in (
+        (("lastTrade", "p"), "live"),
+        (("min", "c"), "live"),
+        (("day", "c"), "close"),
+        (("prevDay", "c"), "close"),
+    ):
+        value = snapshot
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if _number(value) is not None:
+            return mode
+    return "missing"
+
+
 def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     ticker = snapshot.get("ticker")
     day = snapshot.get("day") or {}
@@ -205,6 +220,7 @@ def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "close": _number(day.get("c")),
         "previous_close": _number(prev_day.get("c")),
         "updated_at": _timestamp_to_iso(snapshot.get("updated")),
+        "price_mode": _price_mode(snapshot),
         "provider": "Massive",
     }
 
@@ -306,6 +322,8 @@ def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any
 
     if price is None:
         return {}
+    market_state = str(meta.get("marketState") or "").upper()
+    price_mode = "live" if market_state in {"REGULAR", "PRE", "POST"} else "close"
 
     return {
         "ticker": ticker,
@@ -322,6 +340,7 @@ def normalize_yahoo_chart(payload: dict[str, Any], ticker: str) -> dict[str, Any
         "updated_at": updated_at,
         "currency": meta.get("currency"),
         "exchange": meta.get("exchangeName"),
+        "price_mode": price_mode,
         "provider": "Yahoo Chart",
     }
 
