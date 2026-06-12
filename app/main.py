@@ -757,7 +757,7 @@ async def feed(
         .all()
     )
     localized = (
-        localize_feed_for_zh(settings, db, summaries)
+        localize_feed_for_zh(settings, db, summaries, generate=False)
         if lang.lower().startswith("zh")
         else {}
     )

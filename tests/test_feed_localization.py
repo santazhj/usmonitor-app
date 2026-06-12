@@ -64,6 +64,29 @@ def test_localize_feed_for_zh_does_not_cache_fallback_without_api_key():
     assert LOCALIZATION_ROOT_KEY not in summary.post.raw_json
 
 
+def test_localize_feed_for_zh_can_skip_generation(monkeypatch):
+    summary = summary_with_english_post()
+    db = FakeDb()
+
+    def fail_generate(*args, **kwargs):
+        raise AssertionError("feed endpoint should not generate localizations inline")
+
+    monkeypatch.setattr(
+        "app.services.feed_localization.generate_zh_batch",
+        fail_generate,
+    )
+
+    localized = localize_feed_for_zh(
+        Settings(openai_api_key="sk-test"),
+        db,
+        [summary],
+        generate=False,
+    )
+
+    assert localized[summary.id]["title"] == "$SIVE.ST 机构资金催化"
+    assert db.commits == 0
+
+
 def test_existing_chinese_payload_requires_chinese_notification_body():
     summary = summary_with_english_post()
     summary.title = "Serenity 新帖提醒"

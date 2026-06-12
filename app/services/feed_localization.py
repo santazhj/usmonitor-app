@@ -371,7 +371,11 @@ def generate_zh_batch(
 
 
 def localize_feed_for_zh(
-    settings: Settings, db: Session, summaries: list[AlertSummary]
+    settings: Settings,
+    db: Session,
+    summaries: list[AlertSummary],
+    *,
+    generate: bool = True,
 ) -> dict[str, dict[str, Any]]:
     localized: dict[str, dict[str, Any]] = {}
     pending: list[AlertSummary] = []
@@ -386,7 +390,7 @@ def localize_feed_for_zh(
             continue
         pending.append(summary)
 
-    generated = generate_zh_batch(settings, pending)
+    generated = generate_zh_batch(settings, pending) if generate else {}
     for summary in pending:
         payload = generated.get(summary.id) or fallback_zh_payload(summary)
         localized[summary.id] = payload

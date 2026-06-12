@@ -44,6 +44,7 @@ const state = {
   readAlerts: readSet(READ_ALERTS_KEY),
   savedAlerts: readSet(SAVED_ALERTS_KEY),
   dashboard: null,
+  dashboardError: "",
   feed: [],
   user: null
 };
@@ -430,6 +431,12 @@ function renderSources() {
 
 function renderStatus() {
   const snapshot = state.dashboard;
+  if (state.dashboardError) {
+    els.dataStatus.textContent = t("dashboard.loadFailed");
+    els.lastUpdated.textContent = "--";
+    els.refreshLabel.textContent = "Start backend at http://127.0.0.1:8000";
+    return;
+  }
   const status = snapshot?.data_status || "provider_pending";
   els.dataStatus.textContent = t(`status.${status}`) || snapshot?.data_status_label || status;
   els.lastUpdated.textContent = snapshot?.generated_at ? formatDateTime(snapshot.generated_at) : "--";
@@ -439,6 +446,11 @@ function renderStatus() {
 }
 
 function renderTable() {
+  if (state.dashboardError) {
+    els.dashboardRows.innerHTML = `<div class="terminal-empty-row">${escapeHtml(state.dashboardError)}</div>`;
+    els.tableStatus.textContent = state.dashboardError;
+    return;
+  }
   const rows = currentRows();
   const total = state.dashboard?.rows?.length || 0;
   if (!rows.length) {
@@ -607,15 +619,18 @@ async function loadUser() {
 async function loadDashboard() {
   try {
     state.dashboard = await api("/api/dashboard");
+    state.dashboardError = "";
   } catch (error) {
-    els.dataStatus.textContent = t("dashboard.loadFailed");
-    els.tableStatus.textContent = error.message || t("dashboard.loadFailed");
+    state.dashboard = null;
+    state.dashboardError =
+      "Dashboard API failed. Confirm the backend is running at http://127.0.0.1:8000 and open that URL instead of static/index.html.";
   }
 }
 
 async function loadFeed() {
   try {
     state.feed = await api(`/api/feed?limit=40&lang=${encodeURIComponent(state.language)}`);
+    renderFeed();
   } catch {
     els.feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.failed"))}</p>`;
   }
@@ -769,7 +784,9 @@ async function init() {
   applyCopy();
   bindEvents();
   sendAnalytics("pageview");
-  await Promise.all([loadUser(), loadDashboard(), loadFeed()]);
+  loadUser();
+  loadFeed();
+  await loadDashboard();
   renderAll();
   const startedAt = Date.now();
   window.addEventListener("beforeunload", () => {
