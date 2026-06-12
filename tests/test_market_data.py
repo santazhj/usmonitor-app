@@ -68,6 +68,21 @@ def test_normalize_snapshot_marks_day_price_as_close():
     assert normalized["price_mode"] == "close"
 
 
+def test_normalize_snapshot_ignores_zero_price():
+    normalized = normalize_snapshot(
+        {
+            "ticker": "MSFT",
+            "lastTrade": {"p": 0},
+            "min": {"c": 0},
+            "day": {"c": 0, "v": 1000},
+            "prevDay": {"c": 0},
+        }
+    )
+
+    assert normalized["price"] is None
+    assert normalized["price_mode"] == "missing"
+
+
 def test_normalize_aggregate_candles_extracts_ohlc_rows():
     rows = normalize_aggregate_candles(
         {
@@ -129,6 +144,21 @@ def test_normalize_ticker_overview_extracts_market_cap():
     )
 
     assert normalized["market_cap"] == 3_109_319_914_053.28
+    assert normalized["weighted_shares_outstanding"] == 7_428_434_704
+
+
+def test_normalize_ticker_overview_ignores_zero_market_cap():
+    normalized = normalize_ticker_overview(
+        {
+            "results": {
+                "ticker": "MSFT",
+                "market_cap": 0,
+                "weighted_shares_outstanding": 7_428_434_704,
+            }
+        }
+    )
+
+    assert normalized["market_cap"] is None
     assert normalized["weighted_shares_outstanding"] == 7_428_434_704
 
 
@@ -227,6 +257,28 @@ def test_normalize_yahoo_chart_marks_korea_regular_session_live():
     )
 
     assert normalized["price_mode"] == "live"
+
+
+def test_normalize_yahoo_chart_ignores_zero_price():
+    normalized = normalize_yahoo_chart(
+        {
+            "chart": {
+                "result": [
+                    {
+                        "meta": {
+                            "currency": "USD",
+                            "exchangeName": "NMS",
+                            "regularMarketPrice": 0,
+                        },
+                        "indicators": {"quote": [{"close": [0], "volume": [1000]}]},
+                    }
+                ]
+            }
+        },
+        "MSFT",
+    )
+
+    assert normalized == {}
 
 
 def test_normalize_yahoo_quote_item_extracts_low_frequency_fundamentals():

@@ -590,6 +590,19 @@ function formatCompact(value, prefix = "") {
   return `${prefix}${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(number)}`;
 }
 
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function formatPositiveNumber(value, digits = 2) {
+  return positiveNumber(value) === null ? "--" : formatNumber(value, digits);
+}
+
+function formatPositiveCompact(value, prefix = "") {
+  return positiveNumber(value) === null ? "--" : formatCompact(value, prefix);
+}
+
 function formatPercent(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "--";
@@ -622,7 +635,7 @@ function rowStatus(row) {
   const labels = state.language === "zh"
     ? { live: "实时", close: "收盘", missing: "缺失" }
     : { live: "Live", close: "Close", missing: "Missing" };
-  if (!Number.isFinite(Number(row.price))) return { key: "missing", label: labels.missing };
+  if (positiveNumber(row.price) === null) return { key: "missing", label: labels.missing };
   if (row.price_mode === "live") return { key: "live", label: labels.live };
   if (row.price_mode === "close") return { key: "stale", label: labels.close };
   const updated = parseApiDate(row.market_updated_at);
@@ -829,7 +842,7 @@ function currentRows() {
 }
 
 function pricedDashboardRows() {
-  return (state.dashboard?.rows || []).filter((row) => Number.isFinite(Number(row.price)));
+  return (state.dashboard?.rows || []).filter((row) => positiveNumber(row.price) !== null);
 }
 
 function categoryStats() {
@@ -837,7 +850,7 @@ function categoryStats() {
   const rows = state.dashboard?.rows || [];
   const stats = categories.map((category) => {
     const categoryRows = rows.filter((row) => row.category === category.slug);
-    const priced = categoryRows.filter((row) => Number.isFinite(Number(row.price)));
+    const priced = categoryRows.filter((row) => positiveNumber(row.price) !== null);
     const changes = priced.map((row) => Number(row.change_percent)).filter(Number.isFinite);
     const volume = priced.reduce((sum, row) => sum + (Number(row.dollar_volume) || 0), 0);
     const avgChange = changes.length ? changes.reduce((sum, value) => sum + value, 0) / changes.length : null;
@@ -1102,11 +1115,11 @@ function renderTable() {
               <strong>${escapeHtml(row.ticker)}</strong>
               <small>${escapeHtml(displayCompany(row))}</small>
             </div>
-            <div class="number-cell">${escapeHtml(formatNumber(row.price, 2))}</div>
-            <div class="number-cell ${tone}">${escapeHtml(formatPercent(row.change_percent))}</div>
-            <div class="number-cell">${escapeHtml(formatCompact(row.dollar_volume, "$"))}</div>
-            <div class="number-cell">${escapeHtml(formatCompact(row.market_cap, "$"))}</div>
-            <div class="number-cell">${escapeHtml(row.pe_note || formatNumber(row.pe_ratio, 1))}</div>
+            <div class="number-cell">${escapeHtml(formatPositiveNumber(row.price, 2))}</div>
+            <div class="number-cell ${tone}">${escapeHtml(status.key === "missing" ? "--" : formatPercent(row.change_percent))}</div>
+            <div class="number-cell">${escapeHtml(formatPositiveCompact(row.dollar_volume, "$"))}</div>
+            <div class="number-cell">${escapeHtml(formatPositiveCompact(row.market_cap, "$"))}</div>
+            <div class="number-cell">${escapeHtml(row.pe_note || formatPositiveNumber(row.pe_ratio, 1))}</div>
             <div><span class="soft-badge">${escapeHtml(displayLayer(row))}</span></div>
             <div class="role-cell">
               <strong>${escapeHtml(displayRole(row))}</strong>
@@ -1199,11 +1212,11 @@ function openDrawer(row) {
       <span class="data-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
     </div>
     <div class="drawer-metrics terminal-drawer-grid">
-      ${metricBlock(t("table.price"), formatNumber(row.price, 2))}
-      ${metricBlock(t("table.change"), formatPercent(row.change_percent))}
-      ${metricBlock(t("table.marketCap"), formatCompact(row.market_cap, "$"))}
-      ${metricBlock(t("table.pe"), row.pe_note || formatNumber(row.pe_ratio, 1))}
-      ${metricBlock(t("table.dollarVolume"), formatCompact(row.dollar_volume, "$"))}
+      ${metricBlock(t("table.price"), formatPositiveNumber(row.price, 2))}
+      ${metricBlock(t("table.change"), status.key === "missing" ? "--" : formatPercent(row.change_percent))}
+      ${metricBlock(t("table.marketCap"), formatPositiveCompact(row.market_cap, "$"))}
+      ${metricBlock(t("table.pe"), row.pe_note || formatPositiveNumber(row.pe_ratio, 1))}
+      ${metricBlock(t("table.dollarVolume"), formatPositiveCompact(row.dollar_volume, "$"))}
       ${metricBlock(t("table.source"), status.label)}
     </div>
     <section class="drawer-section">

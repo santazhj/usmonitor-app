@@ -231,7 +231,7 @@ def _price(snapshot: dict[str, Any]) -> float | int | None:
         for key in path:
             value = value.get(key) if isinstance(value, dict) else None
         price = _number(value)
-        if price is not None:
+        if price is not None and price > 0:
             return price
     return None
 
@@ -246,7 +246,8 @@ def _price_mode(snapshot: dict[str, Any]) -> str:
         value = snapshot
         for key in path:
             value = value.get(key) if isinstance(value, dict) else None
-        if _number(value) is not None:
+        price = _number(value)
+        if price is not None and price > 0:
             return mode
     return "missing"
 
@@ -456,7 +457,7 @@ def normalize_ticker_overview(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(result, dict):
         return {}
     return {
-        "market_cap": _number(result.get("market_cap")),
+        "market_cap": _positive_number(result.get("market_cap")),
         "weighted_shares_outstanding": _number(result.get("weighted_shares_outstanding")),
     }
 
@@ -543,7 +544,7 @@ def normalize_yahoo_chart(
         except (TypeError, ValueError, OSError):
             updated_at = None
 
-    if price is None:
+    if price is None or price <= 0:
         return {}
     market_state = str(meta.get("marketState") or "").upper()
     exchange = meta.get("exchangeName")
@@ -587,7 +588,7 @@ def normalize_yahoo_quote_item(item: dict[str, Any]) -> dict[str, Any]:
     if not ticker:
         return {}
 
-    market_cap = _number(item.get("marketCap"))
+    market_cap = _positive_number(item.get("marketCap"))
     shares = _number(item.get("sharesOutstanding")) or _number(
         item.get("impliedSharesOutstanding")
     )

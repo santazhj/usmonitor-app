@@ -8,10 +8,23 @@ from app.services.market_data import MarketDataResult
 
 MAINLAND_LISTING_SUFFIXES = (".SZ", ".SS", ".SH", ".BJ")
 MOJIBAKE_MARKERS = ("杩", "鎴", "鐪", "浠", "鈥", "檚", "锛", "銆", "€?")
+TICKER_EDGE_PUNCTUATION = "$ \t\r\n,;:!?()[]{}<>\"'"
+TICKER_ALIASES = {
+    "SIVE": "SIVE.ST",
+    "IQE": "IQE.L",
+    "SOI": "SOI.PA",
+    "LPK": "LPK.DE",
+    "XFAB": "XFAB.PA",
+    "AL2SI": "AL2SI.PA",
+    "P4O": "P4O.DE",
+}
 
 
 def normalize_ticker(ticker: str) -> str:
-    return ticker.strip().upper()
+    normalized = ticker.strip().upper().strip(TICKER_EDGE_PUNCTUATION)
+    while normalized.endswith("."):
+        normalized = normalized[:-1]
+    return TICKER_ALIASES.get(normalized, normalized)
 
 
 def is_mainland_listing(ticker: str) -> bool:
@@ -779,23 +792,25 @@ def latest_mention_by_ticker(mentions: list[WatchlistMention]) -> dict[str, Watc
 
 def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
     market = market_rows.get(item["ticker"], {})
+    price = market.get("price")
+    has_price = isinstance(price, (int, float)) and price > 0
     return {
-        "price": market.get("price"),
-        "change": market.get("change"),
-        "change_percent": market.get("change_percent"),
-        "volume": market.get("volume"),
-        "dollar_volume": market.get("dollar_volume"),
-        "open": market.get("open"),
-        "high": market.get("high"),
-        "low": market.get("low"),
-        "close": market.get("close"),
+        "price": price if has_price else None,
+        "change": market.get("change") if has_price else None,
+        "change_percent": market.get("change_percent") if has_price else None,
+        "volume": market.get("volume") if has_price else None,
+        "dollar_volume": market.get("dollar_volume") if has_price else None,
+        "open": market.get("open") if has_price else None,
+        "high": market.get("high") if has_price else None,
+        "low": market.get("low") if has_price else None,
+        "close": market.get("close") if has_price else None,
         "previous_close": market.get("previous_close"),
-        "market_cap": market.get("market_cap"),
-        "pe_ratio": market.get("pe_ratio"),
+        "market_cap": market.get("market_cap") if market.get("market_cap") else None,
+        "pe_ratio": market.get("pe_ratio") if market.get("pe_ratio") else None,
         "pe_note": market.get("pe_note"),
         "revenue_growth": None,
         "market_updated_at": market.get("updated_at"),
-        "price_mode": market.get("price_mode"),
+        "price_mode": market.get("price_mode") if has_price else "missing",
         "market_provider": market.get("provider"),
         "fundamentals_provider": market.get("fundamentals_provider"),
         "fundamentals_currency": market.get("fundamentals_currency"),
