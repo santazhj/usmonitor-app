@@ -1,644 +1,238 @@
-import * as THREE from "/static/vendor/three.module.min.js";
-
-const authView = document.querySelector("#authView");
-const memberView = document.querySelector("#memberView");
-const loginForm = document.querySelector("#loginForm");
-const loginMessage = document.querySelector("#loginMessage");
-const accountEmail = document.querySelector("#accountEmail");
-const subscriptionState = document.querySelector("#subscriptionState");
-const pushStatus = document.querySelector("#pushStatus");
-const enablePushBtn = document.querySelector("#enablePushBtn");
-const testPushBtn = document.querySelector("#testPushBtn");
-const paymentBox = document.querySelector("#paymentBox");
-const listBox = document.querySelector("#listBox");
-const feedBox = document.querySelector("#feedBox");
-const logoutBtn = document.querySelector("#logoutBtn");
-const adminLink = document.querySelector("#adminLink");
-const planBadge = document.querySelector("#planBadge");
-const languageToggle = document.querySelector("#languageToggle");
-const dashboardMetrics = document.querySelector("#dashboardMetrics");
-const categoryTabs = document.querySelector("#categoryTabs");
-const dashboardRows = document.querySelector("#dashboardRows");
-const sourceStatus = document.querySelector("#sourceStatus");
-const dataStatus = document.querySelector("#dataStatus");
-const lastUpdated = document.querySelector("#lastUpdated");
-const refreshLabel = document.querySelector("#refreshLabel");
-const dashboardSearch = document.querySelector("#dashboardSearch");
-const tableStatus = document.querySelector("#tableStatus");
-const tickerDrawer = document.querySelector("#tickerDrawer");
-const drawerClose = document.querySelector("#drawerClose");
-const drawerBody = document.querySelector("#drawerBody");
+const els = {
+  logoutBtn: document.querySelector("#logoutBtn"),
+  adminLink: document.querySelector("#adminLink"),
+  languageToggle: document.querySelector("#languageToggle"),
+  dashboardMetrics: document.querySelector("#dashboardMetrics"),
+  categoryTabs: document.querySelector("#categoryTabs"),
+  dashboardRows: document.querySelector("#dashboardRows"),
+  sourceStatus: document.querySelector("#sourceStatus"),
+  dataStatus: document.querySelector("#dataStatus"),
+  lastUpdated: document.querySelector("#lastUpdated"),
+  refreshLabel: document.querySelector("#refreshLabel"),
+  dashboardSearch: document.querySelector("#dashboardSearch"),
+  rowQualityFilter: document.querySelector("#rowQualityFilter"),
+  tableStatus: document.querySelector("#tableStatus"),
+  clearFiltersBtn: document.querySelector("#clearFiltersBtn"),
+  feedBox: document.querySelector("#feedBox"),
+  tickerDrawer: document.querySelector("#tickerDrawer"),
+  drawerClose: document.querySelector("#drawerClose"),
+  drawerBody: document.querySelector("#drawerBody")
+};
 
 const LANGUAGE_KEY = "usmonitor.language";
 const CATEGORY_KEY = "usmonitor.dashboard.category";
 const SEARCH_KEY = "usmonitor.dashboard.search";
 const SORT_FIELD_KEY = "usmonitor.dashboard.sortField";
 const SORT_DIRECTION_KEY = "usmonitor.dashboard.sortDirection";
+const QUALITY_KEY = "usmonitor.dashboard.quality";
+const FEED_FILTER_KEY = "usmonitor.feed.filter";
+const READ_ALERTS_KEY = "usmonitor.feed.read";
+const SAVED_ALERTS_KEY = "usmonitor.feed.saved";
 const VISITOR_KEY = "usmonitor.visitorId";
-const LAST_EMAIL_KEY = "usmonitor.lastEmail";
-const DEFAULT_LANGUAGE = "zh";
+
 const DEFAULT_SORT_FIELD = "dollar_volume";
 const DEFAULT_SORT_DIRECTION = "desc";
 
+const state = {
+  language: localStorage.getItem(LANGUAGE_KEY) || "zh",
+  category: localStorage.getItem(CATEGORY_KEY) || "all",
+  search: localStorage.getItem(SEARCH_KEY) || "",
+  quality: localStorage.getItem(QUALITY_KEY) || "all",
+  sortField: localStorage.getItem(SORT_FIELD_KEY) || DEFAULT_SORT_FIELD,
+  sortDirection: localStorage.getItem(SORT_DIRECTION_KEY) || DEFAULT_SORT_DIRECTION,
+  feedFilter: localStorage.getItem(FEED_FILTER_KEY) || "all",
+  readAlerts: readSet(READ_ALERTS_KEY),
+  savedAlerts: readSet(SAVED_ALERTS_KEY),
+  dashboard: null,
+  feed: [],
+  user: null
+};
+
 const COPY = {
   zh: {
-    "app.title": "US Monitor",
+    "brand.subtitle": "AI 产业链情报终端",
     "nav.dashboard": "看板",
     "nav.alerts": "情报",
     "nav.account": "账户",
     "nav.logout": "退出",
-    "plan.loading": "检查权限",
-    "plan.vip": "VIP 版本",
-    "plan.free": "普通版本",
-    "plan.vipTitle": "当前账户已开通 VIP 权限",
-    "plan.freeTitle": "当前为普通版本",
-    "hero.eyebrow": "AI 基础设施",
-    "hero.title": "美股 AI 产业链终端",
-    "hero.lede":
-      "按算力、半导体、光互连、电力和软件分层跟踪核心标的，聚焦价格、流动性和产业链瓶颈。",
-    "hero.pill.watchlist": "产业链矩阵",
-    "hero.pill.sources": "数据源巡检",
-    "hero.pill.alerts": "精选情报流",
-    "dashboard.refreshTarget": "{seconds}s 刷新目标",
-    "dashboard.updated": "更新于 {date}",
-    "dashboard.unavailable": "看板暂不可用",
-    "dashboard.rowsShown": "显示 {shown}/{total} 个标的，排序：{sort}",
-    "dashboard.noRows": "没有匹配的标的。",
-    "metrics.tracked": "已跟踪",
-    "metrics.market": "行情状态",
-    "metrics.priced": "有行情",
-    "metrics.fundamentals": "基本面",
+    "hero.eyebrow": "AI Infrastructure",
+    "hero.title": "美股 AI 产业链监控",
+    "hero.lede": "按云资本开支、算力网络、晶圆制造、存储、封装、光互连、电力冷却和软件数据分层跟踪核心标的。",
+    "status.label": "数据状态",
+    "filters.title": "产业链分组",
+    "filters.clear": "清空",
+    "sources.title": "数据源",
+    "search.placeholder": "搜索 ticker、公司、AI 角色",
+    "quality.all": "全部",
+    "quality.live": "有行情",
+    "quality.missing": "缺行情",
+    "table.title": "产业链标的矩阵",
+    "table.ticker": "标的",
+    "table.price": "最新价",
+    "table.change": "% 涨跌",
+    "table.dollarVolume": "成交额",
+    "table.marketCap": "市值",
+    "table.pe": "PE",
+    "table.layer": "分层",
+    "table.role": "AI 角色",
+    "table.source": "数据",
+    "alerts.title": "最新情报",
+    "alerts.all": "全部",
+    "alerts.unread": "未读",
+    "alerts.saved": "收藏",
+    "alerts.loading": "正在加载情报...",
+    "alerts.empty": "暂无情报。",
+    "alerts.failed": "情报加载失败，请稍后刷新。",
+    "alerts.read": "已读",
+    "alerts.markRead": "标为已读",
+    "alerts.save": "收藏",
+    "alerts.unsave": "取消收藏",
+    "alerts.source": "原文",
+    "tabs.all": "全部",
+    "metrics.tracked": "标的数",
+    "metrics.priced": "行情覆盖",
     "metrics.core": "核心瓶颈",
     "metrics.attention": "高关注",
-    "metrics.detail.tracked": "全球 AI 暴露池",
-    "metrics.detail.priced": "已接入行情",
-    "metrics.detail.fundamentals": "基本面覆盖",
-    "metrics.detail.core": "供给瓶颈层",
-    "metrics.detail.attention": "高波动关注",
-    "search.label": "搜索",
-    "search.placeholder": "Ticker、公司、AI 角色",
-    "tabs.all": "全部",
-    "table.ticker": "代码",
-    "table.price": "价格",
-    "table.change": "% 涨跌",
-    "table.marketCap": "市值",
-    "table.dollarVolume": "交易额",
-    "table.pe": "PE",
-    "table.aiRole": "AI 角色",
-    "table.latestSignal": "最新观察",
-    "table.pending": "待接入",
-    "table.sectionEyebrow": "Watchlist matrix",
-    "table.sectionTitle": "产业链标的矩阵",
-    "table.sectionMeta": "点击行查看产业链定位",
-    "sort.ticker": "代码",
-    "sort.price": "价格",
+    "metrics.updated": "最近刷新",
+    "metrics.detail.tracked": "当前产业链矩阵标的",
+    "metrics.detail.priced": "{priced}/{total} 有行情",
+    "metrics.detail.core": "供应链核心约束层",
+    "metrics.detail.attention": "高流动性或高关注标的",
+    "metrics.detail.updated": "接口生成时间",
+    "dashboard.refreshTarget": "{seconds}s 刷新目标",
+    "dashboard.rowsShown": "显示 {shown}/{total}，排序：{sort}",
+    "dashboard.noRows": "没有匹配的标的。",
+    "dashboard.loadFailed": "看板加载失败",
+    "status.market_live": "行情在线",
+    "status.provider_error": "行情异常",
+    "status.provider_pending": "等待行情",
+    "row.live": "实时/收盘",
+    "row.missing": "缺数",
+    "row.stale": "陈旧",
+    "drawer.market": "市场数据",
+    "drawer.position": "产业链定位",
+    "drawer.signal": "最新线索",
+    "drawer.range": "日内区间",
+    "drawer.source": "查看来源",
+    "drawer.noSource": "暂无来源",
+    "sort.ticker": "标的",
+    "sort.price": "最新价",
     "sort.change_percent": "% 涨跌",
+    "sort.dollar_volume": "成交额",
     "sort.market_cap": "市值",
-    "sort.dollar_volume": "交易额",
     "sort.pe_ratio": "PE",
-    "drawer.market": "行情",
-    "drawer.aiRole": "AI 角色",
-    "drawer.latestSignal": "最新观察",
-    "drawer.positioning": "产业链定位",
-    "drawer.updated": "行情更新",
-    "drawer.source": "来源",
-    "product3d.eyebrow": "产品形象",
-    "product3d.hint": "拖拽旋转，悬停查看发光状态",
-    "rail.sourceEyebrow": "数据源状态",
-    "rail.sourceTitle": "数据状态",
-    "rail.alertsEyebrow": "提醒",
-    "rail.alertsTitle": "最新情报",
-    "alerts.signedOut": "正在加载公开情报 feed。",
-    "alerts.loading": "正在加载并翻译最新情报...",
-    "alerts.loadFailed": "最新情报暂时加载失败，请稍后刷新。",
-    "alerts.empty": "暂无提醒。",
-    "alerts.viewSource": "查看原帖",
-    "auth.eyebrow": "邮箱注册",
-    "auth.title": "免费注册 / 登录",
-    "auth.email": "邮箱",
-    "auth.submit": "发送登录链接",
-    "auth.sending": "发送中...",
-    "auth.devLink": "开发模式链接：",
-    "auth.openLogin": "打开登录",
-    "auth.sent": "登录链接已发送。",
-    "auth.failed": "登录失败，请检查邮箱。",
-    "auth.remembered": "已记住上次登录邮箱。为了安全，只有服务器登录状态有效时才会自动进入账户。",
-    "account.eyebrow": "账户",
-    "account.active": "已开通",
-    "account.admin": "管理员权限已开通",
-    "account.noExpiry": "无固定到期日",
-    "account.pending": "普通版本",
-    "account.waiting": "高级服务未开通",
-    "push.eyebrow": "推送",
-    "push.title": "iPhone PWA 推送",
-    "push.enable": "开启推送",
-    "push.test": "测试推送",
-    "push.unsupported": "当前浏览器不支持 Web Push。",
-    "push.installed": "已在主屏幕模式运行，可以授权通知。",
-    "push.installFirst": "iPhone 需要先添加到主屏幕，再授权通知。",
-    "push.noVapid": "VAPID 公钥未配置。",
-    "push.denied": "通知权限未开启。",
-    "push.enabled": "推送已开启。",
-    "push.testing": "发送测试中...",
-    "push.testDone": "测试完成，{sent} 成功，{failed} 失败。",
-    "payment.eyebrow": "付款",
-    "payment.title": "升级会员：99 USDT / 月",
-    "payment.adminBypass": "管理员访问已开通，无需付款。",
-    "payment.memberActive": "会员服务已开通，到期前无需再次付款。",
-    "payment.amount": "金额",
-    "payment.month": "月",
-    "payment.noteCode": "备注码",
-    "payment.missing": "未配置",
-    "lists.eyebrow": "列表",
-    "lists.title": "订阅列表",
-    "lists.active": "已开通",
-    "lists.locked": "高级会员",
-    "lists.public": "公开可见",
-    "terms.eyebrow": "定位",
-    "terms.title": "情报摘要，不是交易建议",
-    "terms.body":
-      "当前市场数据和情报先公开展示；邮箱注册用于账户、推送、付款和后续 VIP 权限。"
+    "sort.category_label": "分层"
   },
   en: {
-    "app.title": "US Monitor",
+    "brand.subtitle": "AI supply-chain intelligence terminal",
     "nav.dashboard": "Dashboard",
     "nav.alerts": "Alerts",
     "nav.account": "Account",
     "nav.logout": "Sign out",
-    "plan.loading": "Checking access",
-    "plan.vip": "VIP version",
-    "plan.free": "Free version",
-    "plan.vipTitle": "This account has VIP access.",
-    "plan.freeTitle": "This account is on the free version.",
     "hero.eyebrow": "AI Infrastructure",
-    "hero.title": "US AI Supply Chain Terminal",
-    "hero.lede":
-      "A compact AI supply-chain terminal grouped by compute, semiconductors, optical links, power, and software.",
-    "hero.pill.watchlist": "Watchlist matrix",
-    "hero.pill.sources": "Live source checks",
-    "hero.pill.alerts": "Curated alert feed",
-    "dashboard.refreshTarget": "{seconds}s refresh target",
-    "dashboard.updated": "Updated {date}",
-    "dashboard.unavailable": "Dashboard unavailable",
-    "dashboard.rowsShown": "Showing {shown}/{total} tickers, sorted by {sort}",
-    "dashboard.noRows": "No matching tickers.",
-    "metrics.tracked": "Tracked",
-    "metrics.market": "Market",
+    "hero.title": "US AI Supply Chain Monitor",
+    "hero.lede": "Track AI infrastructure names by cloud capex, compute, foundry, memory, packaging, optics, power, and software layers.",
+    "status.label": "Data status",
+    "filters.title": "Supply-chain layers",
+    "filters.clear": "Clear",
+    "sources.title": "Sources",
+    "search.placeholder": "Search ticker, company, AI role",
+    "quality.all": "All",
+    "quality.live": "Priced",
+    "quality.missing": "Missing",
+    "table.title": "Supply-chain ticker matrix",
+    "table.ticker": "Ticker",
+    "table.price": "Last",
+    "table.change": "% Chg",
+    "table.dollarVolume": "$ Vol",
+    "table.marketCap": "Mkt Cap",
+    "table.pe": "PE",
+    "table.layer": "Layer",
+    "table.role": "AI Role",
+    "table.source": "Data",
+    "alerts.title": "Latest Intelligence",
+    "alerts.all": "All",
+    "alerts.unread": "Unread",
+    "alerts.saved": "Saved",
+    "alerts.loading": "Loading alerts...",
+    "alerts.empty": "No alerts yet.",
+    "alerts.failed": "Alerts could not be loaded. Please refresh later.",
+    "alerts.read": "Read",
+    "alerts.markRead": "Mark read",
+    "alerts.save": "Save",
+    "alerts.unsave": "Unsave",
+    "alerts.source": "Source",
+    "tabs.all": "All",
+    "metrics.tracked": "Tickers",
     "metrics.priced": "Priced",
-    "metrics.fundamentals": "Fundamentals",
     "metrics.core": "Core Chokepoints",
     "metrics.attention": "High Attention",
-    "metrics.detail.tracked": "Global AI exposure set",
-    "metrics.detail.priced": "Market data coverage",
-    "metrics.detail.fundamentals": "Fundamental coverage",
+    "metrics.updated": "Updated",
+    "metrics.detail.tracked": "Current supply-chain matrix",
+    "metrics.detail.priced": "{priced}/{total} priced",
     "metrics.detail.core": "Supply constraint layers",
-    "metrics.detail.attention": "High-volatility focus",
-    "search.label": "Search",
-    "search.placeholder": "Ticker, company, AI role",
-    "tabs.all": "All",
-    "table.ticker": "Ticker",
-    "table.price": "Price",
-    "table.change": "% Chg",
-    "table.marketCap": "Mkt Cap",
-    "table.dollarVolume": "Dollar Vol",
-    "table.pe": "PE",
-    "table.aiRole": "AI Role",
-    "table.latestSignal": "Latest Signal",
-    "table.pending": "Pending",
-    "table.sectionEyebrow": "Watchlist matrix",
-    "table.sectionTitle": "Supply-chain ticker matrix",
-    "table.sectionMeta": "Click any row for positioning detail",
+    "metrics.detail.attention": "High-liquidity or high-attention names",
+    "metrics.detail.updated": "API generation time",
+    "dashboard.refreshTarget": "{seconds}s refresh target",
+    "dashboard.rowsShown": "Showing {shown}/{total}, sorted by {sort}",
+    "dashboard.noRows": "No matching tickers.",
+    "dashboard.loadFailed": "Dashboard failed to load",
+    "status.market_live": "Market live",
+    "status.provider_error": "Provider error",
+    "status.provider_pending": "Provider pending",
+    "row.live": "Live/close",
+    "row.missing": "Missing",
+    "row.stale": "Stale",
+    "drawer.market": "Market Data",
+    "drawer.position": "Supply-chain Position",
+    "drawer.signal": "Latest Signal",
+    "drawer.range": "Daily Range",
+    "drawer.source": "View Source",
+    "drawer.noSource": "No source",
     "sort.ticker": "Ticker",
-    "sort.price": "Price",
+    "sort.price": "Last",
     "sort.change_percent": "% Chg",
+    "sort.dollar_volume": "$ Vol",
     "sort.market_cap": "Market Cap",
-    "sort.dollar_volume": "Dollar Vol",
     "sort.pe_ratio": "PE",
-    "drawer.market": "Market",
-    "drawer.aiRole": "AI Role",
-    "drawer.latestSignal": "Latest Signal",
-    "drawer.positioning": "Supply-chain position",
-    "drawer.updated": "Market updated",
-    "drawer.source": "Source",
-    "product3d.eyebrow": "Product Object",
-    "product3d.hint": "Drag to rotate; hover to energize",
-    "rail.sourceEyebrow": "Source Status",
-    "rail.sourceTitle": "Data Status",
-    "rail.alertsEyebrow": "Alerts",
-    "rail.alertsTitle": "Latest Intelligence",
-    "alerts.signedOut": "Loading the public alert feed.",
-    "alerts.loading": "Loading and translating latest alerts...",
-    "alerts.loadFailed": "Latest alerts could not be loaded. Please refresh later.",
-    "alerts.empty": "No alerts yet.",
-    "alerts.viewSource": "View source post",
-    "auth.eyebrow": "Email Access",
-    "auth.title": "Free sign up or sign in",
-    "auth.email": "Email",
-    "auth.submit": "Send login link",
-    "auth.sending": "Sending...",
-    "auth.devLink": "Development link: ",
-    "auth.openLogin": "Open login",
-    "auth.sent": "Login link sent.",
-    "auth.failed": "Login failed. Check your email.",
-    "auth.remembered": "Last email remembered. For security, automatic account access only uses the server session.",
-    "account.eyebrow": "Account",
-    "account.active": "Active",
-    "account.admin": "Admin access active",
-    "account.noExpiry": "No fixed expiry",
-    "account.pending": "Free version",
-    "account.waiting": "Premium not active",
-    "push.eyebrow": "Push",
-    "push.title": "iPhone PWA Push",
-    "push.enable": "Enable push",
-    "push.test": "Test push",
-    "push.unsupported": "This browser does not support Web Push.",
-    "push.installed": "Running from the home screen. Notification permission can be granted.",
-    "push.installFirst": "On iPhone, add the app to the home screen before enabling notifications.",
-    "push.noVapid": "VAPID public key is not configured.",
-    "push.denied": "Notification permission was not granted.",
-    "push.enabled": "Push is enabled.",
-    "push.testing": "Sending test...",
-    "push.testDone": "Test complete: {sent} sent, {failed} failed.",
-    "payment.eyebrow": "Payment",
-    "payment.title": "Upgrade: 99 USDT / month",
-    "payment.adminBypass": "Admin access is active. No payment required.",
-    "payment.memberActive": "Premium is active. No payment is required before expiry.",
-    "payment.amount": "Amount",
-    "payment.month": "month",
-    "payment.noteCode": "Note code",
-    "payment.missing": "Not configured",
-    "lists.eyebrow": "Lists",
-    "lists.title": "Subscribed Lists",
-    "lists.active": "Active",
-    "lists.locked": "Premium",
-    "lists.public": "Public",
-    "terms.eyebrow": "Positioning",
-    "terms.title": "Intelligence summaries, not trading advice",
-    "terms.body":
-      "Market data and intelligence are public for now. Email registration powers accounts, push, payment, and future VIP access."
+    "sort.category_label": "Layer"
   }
 };
 
-const CATEGORY_ZH = {
-  "Cloud CAPEX": "云 CAPEX",
-  "Compute & Network": "算力与网络",
-  "Foundry & Test": "晶圆代工与测试",
-  "Memory & Storage": "内存与存储",
-  "Packaging & Substrate": "先进封装与载板",
-  "Optical & Photonics": "光互连与光子",
-  "Power & Cooling": "电力与冷却",
-  "Software & Data": "软件与数据",
-  "Serenity Adds": "Serenity 动态加入"
-};
+function t(key, params = {}) {
+  let value = COPY[state.language]?.[key] || COPY.zh[key] || key;
+  Object.entries(params).forEach(([name, replacement]) => {
+    value = value.replaceAll(`{${name}}`, replacement);
+  });
+  return value;
+}
 
-const VALUE_ZH = {
-  "Demand-side anchors that drive the full AI factory order book.":
-    "驱动整条 AI 工厂订单链的需求端锚点。",
-  "GPU, ASIC, Ethernet, SerDes, and rack-scale connectivity.":
-    "GPU、ASIC、以太网、SerDes 与机架级连接。",
-  "Advanced nodes, EUV, process control, and AI chip test bottlenecks.":
-    "先进制程、EUV、过程控制与 AI 芯片测试瓶颈。",
-  "HBM, server DRAM, eSSD, NAND controllers, and memory-cycle leverage.":
-    "HBM、服务器 DRAM、eSSD、NAND 控制器和内存周期弹性。",
-  "CoWoS, ABF, IC substrate, advanced PCB, and packaging materials.":
-    "CoWoS、ABF、IC 载板、高阶 PCB 与封装材料。",
-  "800G/1.6T optics, lasers, InP, SOI, GaAs, CPO/LRO, and optical modules.":
-    "800G/1.6T 光模块、激光器、InP、SOI、GaAs、CPO/LRO 与光模块。",
-  "Switchgear, UPS, liquid cooling, thermal systems, and onsite power.":
-    "开关设备、UPS、液冷、热管理系统与现场电力。",
-  "High-attention AI application and data-platform names for comparison.":
-    "用于对照的高关注 AI 应用与数据平台标的。",
-  "Tickers added from positive Serenity X-source analysis.":
-    "来自 Serenity X 来源正面分析后动态加入的标的。",
-  "Market data provider pending": "行情数据源待接入",
-  "Market data live": "行情数据已接入",
-  "Market data provider error": "行情数据源错误",
-  "Information dashboard only. Not investment advice.": "仅作信息看板，不构成投资建议。",
-  "Demand anchor": "需求锚点",
-  "Industry reference": "产业参考",
-  "Core chokepoint": "核心瓶颈",
-  "High elasticity": "高弹性",
-  "Validation": "验证中",
-  "Proxy": "代理标的",
-  "High attention": "高关注",
-  "High liquidity": "高流动性",
-  "Medium liquidity": "中等流动性",
-  "Global focus": "全球关注",
-  "Niche/global": "小众/全球",
-  "Serenity positive": "Serenity 正面提及",
-  "Source driven": "来源驱动",
-  "Positive source mention": "来源正面提及",
-  "Added from a constructive Serenity X-source post": "来自 Serenity X 来源的建设性正面帖子",
-  "live": "已上线",
-  "pending": "待接入",
-  "error": "错误",
-  "Serenity Alert": "Serenity Alert",
-  "X original-post monitor is deployed.": "X 原创帖监控已上线。",
-  "AI chokepoint map": "AI 瓶颈地图",
-  "Dashboard taxonomy is seeded from the AI supply-chain report.":
-    "看板分类已基于 AI 产业链报告初始化。",
-  "Market data": "行情数据",
-  "Provider adapter is not connected yet.": "行情源适配器尚未接入。",
-  Fundamentals: "基本面数据",
-  "Daily cache will be enabled with the market data provider.":
-    "接入行情源后会启用每日基本面缓存。",
-  "Curated AI supply-chain and market intelligence from selected X sources.":
-    "来自精选 X 来源的 AI 产业链和市场情报。"
-};
+function readSet(key) {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(key) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
 
-const ROW_ZH = {
-  MSFT: ["云 CAPEX", "Azure AI 需求锚点", "关注 AI 收入运行率、Azure 增速和资本开支纪律"],
-  GOOGL: ["云/TPU", "TPU、Google Cloud 与内部模型基础设施", "关注云 backlog、TPU 规模和 CAPEX 轨迹"],
-  AMZN: ["云/ASIC", "AWS、Trainium 与超大规模基础设施需求", "关注 AWS 增速、Trainium 承诺和数据中心资本开支"],
-  META: ["AI 工厂", "大型 AI 基础设施支出方", "关注 2026 CAPEX 指引和商业化压力"],
-  ORCL: ["GPU 云", "AI 云容量和 GPU 基础设施供应商", "关注 AI 云 backlog 和客户集中度"],
-  NBIS: ["AI 云", "高 beta AI 云容量供应商", "关注超大客户合约和 GPU 利用率"],
-  NVDA: ["GPU/网络", "AI 机架级平台参考资产", "关注数据中心网络增速相对计算业务的变化"],
-  AMD: ["GPU/CPU", "替代加速器和服务器 CPU 供应商", "关注 MI 系列采用率和超大客户绑定"],
-  AVGO: ["定制 ASIC/网络", "超大客户定制芯片的核心受益者", "关注 AI 收入、XPU 项目和网络业务占比"],
-  MRVL: ["定制芯片/光互连", "连接定制芯片、DSP 与电光互连的桥梁", "关注定制芯片 backlog 和 1.6T DSP 放量"],
-  ANET: ["AI 以太网", "云端 AI spine/leaf 交换机供应商", "关注 800G/1.6T 交换周期和云客户集中度"],
-  ALAB: ["PCIe/CXL", "AI 服务器 retimer 和机架连接受益标的", "关注连接器件 attach rate 和估值风险"],
-  CRDO: ["AEC/SerDes", "高速连接和主动电缆受益标的", "关注 800G/1.6T AEC 渗透率和客户集中度"],
-  SMCI: ["AI 服务器", "机架级 AI 服务器集成代理标的", "关注毛利率、出货节奏和客户质量"],
-  DELL: ["AI 服务器", "企业 AI 服务器渠道", "关注 AI 服务器 backlog 和利润率转化"],
-  TSM: ["晶圆代工/CoWoS", "AI 加速器和先进封装的系统性瓶颈", "关注 N2/A16、CoWoS 扩产和 HPC 晶圆需求"],
-  ASML: ["EUV", "先进逻辑和 DRAM EUV 的上游瓶颈", "关注 High-NA/EUV 需求和出口管制影响"],
-  AMAT: ["设备", "沉积、刻蚀和先进封装设备敞口", "关注 GAA 和先进封装资本开支"],
-  LRCX: ["设备", "面向内存和先进制程的刻蚀/沉积设备敞口", "关注内存资本开支复苏和 AI DRAM 强度"],
-  KLAC: ["检测/量测", "先进制程和先进封装的良率控制受益者", "关注工艺复杂度上升带来的检测强度"],
-  "6857.T": ["AI 芯片测试", "SoC、HBM 和 AI 加速器测试瓶颈", "关注 AI 测试时间、HBM 复杂度和订单动能"],
-  "BESI.AS": ["混合键合", "高 beta 混合键合设备敞口", "关注 HBM4、SoIC 和 3D 堆叠订单转化"],
-  MU: ["HBM/DRAM/eSSD", "美股核心 HBM 和 AI 内存敞口", "关注 HBM4 放量、毛利率和供给纪律"],
-  "000660.KS": ["HBM", "财务验证较强的领先 HBM 供应商", "关注 HBM4 合约、ASP 和长期供货协议"],
-  "005930.KS": ["HBM/DRAM/晶圆代工", "HBM 追赶者和内存周期参考资产", "关注 HBM4 认证和晶圆代工客户进展"],
-  SNDK: ["NAND/eSSD", "AI 存储和 NAND 周期弹性", "关注 eSSD 需求和 NAND 定价纪律"],
-  SIMO: ["NAND 控制器", "SSD 和嵌入式存储需求的控制器敞口", "关注 AI 存储周期和控制器 ASP"],
-  EWY: ["韩国内存篮子", "SK hynix 和 Samsung 敞口的流动性代理", "关注韩国内存周期和 HBM 份额变化"],
-  "4062.T": ["ABF 载板", "AI GPU/ASIC 高端封装载板敞口", "关注 ABF 产能、客户结构和 ASP 周期"],
-  "3037.TW": ["ABF/PCB", "AI 服务器 PCB 和高层数载板敞口", "关注良率、定价和台湾 AI 链需求"],
-  "2802.T": ["ABF 薄膜", "高端载板中的隐性材料瓶颈", "关注 ABF 规格升级和材料组合贡献"],
-  "ATS.VI": ["IC 载板", "高 beta 载板和先进 PCB 供应商", "关注杠杆、折旧压力和 AI/HPC 订单质量"],
-  AEHR: ["晶圆级测试", "SiC、GaN 和光子方向的小盘测试敞口", "关注真实 AI 相关订单与叙事动能的差异"],
-  COHR: ["激光器/收发器", "机构型光互连产业链资产", "关注 AI 光学协议、800G/1.6T 和利润率修复"],
-  LITE: ["激光器/光学组件", "AI 数据通信中的激光器和光组件敞口", "关注 datacom 复苏和客户集中度"],
-  FN: ["光模块制造", "光模块制造产能代理标的", "关注 800G/1.6T 客户放量和利润率上限"],
-  GLW: ["光纤/先进光学", "大盘光学材料参考资产", "关注数据中心光纤需求和 AI 光学合作"],
-  AAOI: ["光模块", "高关注 AI 光模块 beta", "关注 800G/1.6T 出货和客户集中度"],
-  AXTI: ["InP/GaAs 衬底", "Serenity 风格底层光子材料敞口", "关注 InP 需求、出口管制和客户验证"],
-  "SIVE.ST": ["DFB 激光器/CPO", "小盘 LRO/CPO 光源敞口", "关注 Jabil 1.6T LRO 进展和融资风险"],
-  "SOI.PA": ["SOI 衬底", "硅光和 SOI 材料敞口", "关注 CPO 采用率和 RF-SOI 复苏"],
-  "IQE.L": ["外延", "化合物半导体外延敞口", "关注光子需求、盈利能力和融资风险"],
-  TSEM: ["特色晶圆代工", "模拟和硅光晶圆代工敞口", "关注 AI 纯度和特色代工需求"],
-  VRT: ["电力/热管理", "AI 数据中心电力和冷却的直接瓶颈", "关注 backlog、液冷和交付执行"],
-  ETN: ["电气设备", "开关设备、变压器和配电敞口", "关注数据中心电气 backlog 和产能释放"],
-  "SU.PA": ["电力管理", "欧洲核心数据中心电气化资产", "关注 AI 数据中心需求和欧洲周期敞口"],
-  NVT: ["电气箱体", "电气保护和箱体内容量敞口", "关注每机架内容量和工业周期风险"],
-  MOD: ["热管理", "液冷和散热高 beta 敞口", "关注 CDU、冷板和数据中心冷却订单"],
-  BE: ["现场电力", "数据中心燃料电池和现场电力可选项", "关注已签电力合约和融资质量"],
-  CEG: ["清洁电力", "面向数据中心需求的大型电力供应商", "关注核电/数据中心电力合约"],
-  GEV: ["电网/电力", "电网设备和电气化 backlog 代理", "关注电网设备需求和利润率执行"],
-  PWR: ["电网建设", "输电和电力基础设施施工代理", "关注公用事业和数据中心电网 backlog"],
-  XLU: ["公用事业篮子", "AI 电力主题的流动性 ETF 代理", "关注电力需求叙事与公用事业利率周期风险"],
-  PLTR: ["AI 平台", "企业 AI 工作流和政府 AI 敞口", "关注 AIP 采用、估值和经营杠杆"],
-  SNOW: ["数据云", "服务 AI 工作负载的企业数据平台", "关注 consumption 增长和 AI 产品商业化"],
-  DDOG: ["可观测性", "云和 AI 工作负载可观测性敞口", "关注 AI 工作负载增长和净留存"],
-  CRWD: ["安全", "AI 时代端点和云安全平台", "关注平台整合和 AI 安全需求"],
-  RDDT: ["数据/注意力", "高关注数据授权和社交平台资产", "关注数据授权收入和广告变现"],
-  FIG: ["设计软件", "产品设计协作和 AI 工作流敞口", "关注企业采用和 AI 设计工具竞争"]
-};
-
-const COMPANY_ZH = {
-  MSFT: "微软",
-  GOOGL: "谷歌母公司",
-  AMZN: "亚马逊",
-  META: "Meta平台公司",
-  ORCL: "甲骨文",
-  NBIS: "内比乌斯集团",
-  NVDA: "英伟达",
-  AMD: "超威半导体",
-  AVGO: "博通",
-  MRVL: "迈威尔科技",
-  ANET: "阿里斯塔网络",
-  ALAB: "阿斯特拉实验室",
-  CRDO: "科瑞多科技",
-  SMCI: "超微电脑",
-  DELL: "戴尔科技",
-  TSM: "台积电",
-  ASML: "阿斯麦",
-  AMAT: "应用材料",
-  LRCX: "泛林集团",
-  KLAC: "科磊",
-  "6857.T": "爱德万测试",
-  "BESI.AS": "贝思半导体",
-  MU: "美光科技",
-  "000660.KS": "SK海力士",
-  "005930.KS": "三星电子",
-  SNDK: "闪迪",
-  SIMO: "慧荣科技",
-  EWY: "韩国股票ETF",
-  "4062.T": "揖斐电",
-  "3037.TW": "欣兴电子",
-  "2802.T": "味之素",
-  "ATS.VI": "奥特斯",
-  AEHR: "艾尔测试系统",
-  COHR: "相干公司",
-  LITE: "朗美通",
-  FN: "法布里内特",
-  GLW: "康宁",
-  AAOI: "应用光电",
-  AXTI: "AXT材料",
-  "SIVE.ST": "西弗斯半导体",
-  "SOI.PA": "索泰克",
-  "IQE.L": "IQE外延",
-  TSEM: "高塔半导体",
-  VRT: "维谛技术",
-  ETN: "伊顿",
-  "SU.PA": "施耐德电气",
-  NVT: "恩伟特",
-  MOD: "摩丁制造",
-  BE: "布鲁姆能源",
-  CEG: "星座能源",
-  GEV: "GE能源科技",
-  PWR: "昆塔服务",
-  XLU: "公用事业精选行业基金",
-  PLTR: "帕兰提尔",
-  SNOW: "雪花",
-  DDOG: "数据狗",
-  CRWD: "众击安全",
-  RDDT: "红迪",
-  FIG: "菲格玛"
-};
-
-let appConfig = {};
-let dashboardSnapshot = null;
-let selectedCategory = localStorage.getItem(CATEGORY_KEY) || "all";
-let searchQuery = localStorage.getItem(SEARCH_KEY) || "";
-let sortField = localStorage.getItem(SORT_FIELD_KEY) || DEFAULT_SORT_FIELD;
-let sortDirection = localStorage.getItem(SORT_DIRECTION_KEY) || DEFAULT_SORT_DIRECTION;
-let activeDrawerTicker = null;
-let activeProductScene = null;
-let authChecked = false;
-let currentUser = null;
-let currentLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY));
-let lastEngagementAt = Date.now();
+function writeSet(key, set) {
+  localStorage.setItem(key, JSON.stringify([...set]));
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    credentials: "include",
+    credentials: "same-origin",
     ...options
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || response.statusText);
+    const error = new Error(text || "Request failed");
+    error.status = response.status;
+    throw error;
   }
   if (response.status === 204) return null;
   return response.json();
-}
-
-function getVisitorId() {
-  let visitorId = localStorage.getItem(VISITOR_KEY);
-  if (!visitorId) {
-    visitorId =
-      window.crypto?.randomUUID?.() ||
-      `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    localStorage.setItem(VISITOR_KEY, visitorId);
-  }
-  return visitorId;
-}
-
-function analyticsPayload(eventType, durationSeconds = 0) {
-  return {
-    visitor_id: getVisitorId(),
-    event_type: eventType,
-    path: `${location.pathname}${location.hash || ""}`,
-    duration_seconds: Math.max(0, Math.round(durationSeconds)),
-    language: currentLanguage,
-    viewport: `${window.innerWidth}x${window.innerHeight}`
-  };
-}
-
-function sendAnalytics(eventType, durationSeconds = 0, useBeacon = false) {
-  const payload = analyticsPayload(eventType, durationSeconds);
-  if (useBeacon && navigator.sendBeacon) {
-    const blob = new Blob([JSON.stringify(payload)], {
-      type: "application/json"
-    });
-    navigator.sendBeacon("/api/analytics/event", blob);
-    return;
-  }
-  fetch("/api/analytics/event", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    keepalive: useBeacon,
-    body: JSON.stringify(payload)
-  }).catch(() => {});
-}
-
-function flushEngagement(useBeacon = false) {
-  const now = Date.now();
-  const seconds = (now - lastEngagementAt) / 1000;
-  lastEngagementAt = now;
-  if (seconds >= 2) {
-    sendAnalytics("heartbeat", seconds, useBeacon);
-  }
-}
-
-function startAnalytics() {
-  sendAnalytics("pageview");
-  window.setInterval(() => {
-    if (document.visibilityState === "visible") {
-      flushEngagement();
-    }
-  }, 30_000);
-  window.addEventListener("hashchange", () => sendAnalytics("pageview"));
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
-      flushEngagement(true);
-    } else {
-      lastEngagementAt = Date.now();
-    }
-  });
-  window.addEventListener("pagehide", () => flushEngagement(true));
-}
-
-function normalizeLanguage(value) {
-  return value === "en" ? "en" : DEFAULT_LANGUAGE;
-}
-
-function t(key, vars = {}) {
-  const template = COPY[currentLanguage][key] || COPY.en[key] || key;
-  return Object.entries(vars).reduce(
-    (text, [name, value]) => text.replaceAll(`{${name}}`, value),
-    template
-  );
-}
-
-function localizeValue(value) {
-  if (currentLanguage !== "zh") return value;
-  return CATEGORY_ZH[value] || VALUE_ZH[value] || value;
-}
-
-function localizeRow(row, field) {
-  if (currentLanguage !== "zh") return row[field];
-  const fields = ["ai_layer", "role", "latest_signal"];
-  const rowCopy = ROW_ZH[row.ticker];
-  const index = fields.indexOf(field);
-  if (rowCopy && index !== -1) return rowCopy[index];
-  return localizeValue(row[field]);
-}
-
-function localizeCompany(row) {
-  if (currentLanguage !== "zh") return row.company;
-  return COMPANY_ZH[row.ticker] || row.company;
-}
-
-function localizeSourceDetail(source) {
-  if (source.name === "Market data") {
-    if (source.status === "live") {
-      if (currentLanguage !== "zh") return source.detail;
-      const provider = source.provider || "";
-      const quoteFallback = provider.includes("Yahoo Chart")
-        ? "；非美股行情使用 Yahoo Chart fallback"
-        : "";
-      const fundamentalsFallback = provider.includes("Yahoo Quote")
-        ? "；PE/市值使用 Yahoo Quote 低频缓存"
-        : "";
-      const staticFallback = provider.includes("Static Fundamentals")
-        ? "；部分 PE/市值使用静态低频兜底"
-        : "";
-      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}${quoteFallback}${fundamentalsFallback}${staticFallback}。`;
-    }
-    if (source.status === "error") {
-      return currentLanguage === "zh"
-        ? "Massive snapshot 连接异常，暂未返回可用行情。"
-        : source.detail;
-    }
-  }
-  if (source.name === "Fundamentals" && currentLanguage === "zh") {
-    if (source.status === "live") {
-      const count = source.detail.match(/for (\d+) tickers/)?.[1] || "";
-      return count
-        ? `PE/市值低频缓存已补全 ${count} 个标的。`
-        : "PE/市值低频缓存已接入。";
-    }
-    return "PE/市值低频缓存等待数据源返回。";
-  }
-  if (currentLanguage !== "zh") return source.detail;
-  if (source.name === "Market data" && source.provider?.includes("Massive")) {
-    if (source.status === "live") {
-      const fallback = source.provider?.includes("Yahoo")
-        ? "；非美股使用 Yahoo Chart 免费 fallback"
-        : "";
-      return `Massive snapshot 已连接，行情 ${source.loaded_tickers}/${source.eligible_tickers}，基本面 ${source.fundamentals_loaded}/${source.loaded_tickers}${fallback}。`;
-    }
-    if (source.status === "error") {
-      return "Massive snapshot 连接异常，暂未返回可用行情。";
-    }
-  }
-  return localizeValue(source.detail);
 }
 
 function escapeHtml(value) {
@@ -650,1128 +244,537 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function applyStaticCopy() {
-  document.documentElement.lang = currentLanguage === "zh" ? "zh-Hans" : "en";
-  document.title = t("app.title");
-  languageToggle.textContent = currentLanguage === "zh" ? "EN" : "中文";
-  languageToggle.setAttribute(
-    "aria-label",
-    currentLanguage === "zh" ? "Switch to English" : "切换到中文"
-  );
+function formatNumber(value, digits = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "--";
+  return new Intl.NumberFormat(state.language === "zh" ? "zh-Hans" : "en-US", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits
+  }).format(number);
+}
+
+function formatCompact(value, prefix = "") {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "--";
+  const abs = Math.abs(number);
+  const locale = state.language === "zh" ? "zh-Hans" : "en-US";
+  if (abs >= 1_000_000_000_000) return `${prefix}${formatNumber(number / 1_000_000_000_000, 2)}T`;
+  if (abs >= 1_000_000_000) return `${prefix}${formatNumber(number / 1_000_000_000, 2)}B`;
+  if (abs >= 1_000_000) return `${prefix}${formatNumber(number / 1_000_000, 2)}M`;
+  return `${prefix}${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(number)}`;
+}
+
+function formatPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "--";
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${formatNumber(number, 2)}%`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString(state.language === "zh" ? "zh-Hans" : "en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function rowStatus(row) {
+  if (!Number.isFinite(Number(row.price))) return { key: "missing", label: t("row.missing") };
+  const updated = row.market_updated_at ? new Date(row.market_updated_at) : null;
+  if (updated && Date.now() - updated.getTime() > 1000 * 60 * 60 * 36) {
+    return { key: "stale", label: t("row.stale") };
+  }
+  return { key: "live", label: t("row.live") };
+}
+
+function sortValue(row, field) {
+  const value = row[field];
+  if (field === "ticker" || field === "category_label") return String(value || "");
+  const number = Number(value);
+  return Number.isFinite(number) ? number : Number.NEGATIVE_INFINITY;
+}
+
+function currentRows() {
+  const rows = [...(state.dashboard?.rows || [])];
+  const search = state.search.trim().toLowerCase();
+  return rows
+    .filter((row) => state.category === "all" || row.category === state.category)
+    .filter((row) => {
+      const quality = rowStatus(row).key;
+      if (state.quality === "live") return quality !== "missing";
+      if (state.quality === "missing") return quality === "missing";
+      return true;
+    })
+    .filter((row) => {
+      if (!search) return true;
+      return [
+        row.ticker,
+        row.company,
+        row.category_label,
+        row.ai_layer,
+        row.role,
+        row.latest_signal
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(search);
+    })
+    .sort((a, b) => {
+      const av = sortValue(a, state.sortField);
+      const bv = sortValue(b, state.sortField);
+      let result = typeof av === "string" ? av.localeCompare(bv) : av - bv;
+      if (state.sortDirection === "desc") result *= -1;
+      return result;
+    });
+}
+
+function applyCopy() {
+  document.documentElement.lang = state.language === "zh" ? "zh-Hans" : "en";
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     element.textContent = t(element.dataset.i18n);
   });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
-    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+    element.placeholder = t(element.dataset.i18nPlaceholder);
   });
-  updatePlanBadge(currentUser);
-}
-
-function updatePlanBadge(me) {
-  if (!planBadge) return;
-  if (!authChecked && !me) {
-    planBadge.textContent = t("plan.loading");
-    planBadge.dataset.planStatus = "loading";
-    planBadge.setAttribute("title", t("plan.loading"));
-    return;
-  }
-  const isVip = Boolean(me?.subscription?.active);
-  planBadge.textContent = isVip ? t("plan.vip") : t("plan.free");
-  planBadge.dataset.planStatus = isVip ? "vip" : "free";
-  planBadge.setAttribute("title", isVip ? t("plan.vipTitle") : t("plan.freeTitle"));
-}
-
-function showSignedOut() {
-  currentUser = null;
-  authChecked = true;
-  authView?.classList.add("hidden");
-  memberView?.classList.add("hidden");
-  logoutBtn.classList.add("hidden");
-  adminLink.classList.add("hidden");
-  const rememberedEmail = localStorage.getItem(LAST_EMAIL_KEY) || "";
-  const emailInput = loginForm?.querySelector('input[name="email"]');
-  if (rememberedEmail && emailInput && !emailInput.value) {
-    emailInput.value = rememberedEmail;
-    if (loginMessage) {
-      loginMessage.textContent = t("auth.remembered");
-    }
-  }
-  loadFeed();
-  updatePlanBadge(null);
-}
-
-function showSignedIn(me) {
-  currentUser = me;
-  authChecked = true;
-  localStorage.setItem(LAST_EMAIL_KEY, me.email);
-  authView?.classList.add("hidden");
-  memberView?.classList.add("hidden");
-  logoutBtn.classList.remove("hidden");
-  adminLink.classList.toggle("hidden", !me.is_admin);
-  renderFeedLoading();
-  updatePlanBadge(me);
-}
-
-function renderFeedLoading() {
-  feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.loading"))}</p>`;
-}
-
-function renderFeedError() {
-  feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.loadFailed"))}</p>`;
-}
-
-function moneyAddress(value) {
-  return value
-    ? `<code>${escapeHtml(value)}</code>`
-    : `<span class="muted">${escapeHtml(t("payment.missing"))}</span>`;
-}
-
-function formatDate(value) {
-  if (!value) return "--";
-  return new Date(value).toLocaleString(
-    currentLanguage === "zh" ? "zh-Hans" : "en-US",
-    {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
-}
-
-function formatPrice(value) {
-  if (value === null || value === undefined) return "--";
-  return Number(value).toLocaleString("en-US", {
-    minimumFractionDigits: Number(value) >= 100 ? 2 : 3,
-    maximumFractionDigits: Number(value) >= 100 ? 2 : 4
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    if (element.tagName === "OPTION") element.textContent = t(element.dataset.i18n);
   });
+  els.languageToggle.textContent = state.language === "zh" ? "EN" : "中文";
 }
 
-function formatPriceWithCurrency(row) {
-  const price = formatPrice(row.price);
-  if (price === "--") return price;
-  return row.currency && row.currency !== "USD" ? `${price} ${row.currency}` : price;
-}
-
-function formatPercent(value) {
-  if (value === null || value === undefined) return "--";
-  const number = Number(value);
-  const sign = number > 0 ? "+" : "";
-  return `${sign}${number.toFixed(2)}%`;
-}
-
-function formatCompactNumber(value) {
-  if (value === null || value === undefined) return "--";
-  return Number(value).toLocaleString("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1
-  });
-}
-
-function formatMarketCap(value) {
-  if (value === null || value === undefined) return "--";
-  return Number(value).toLocaleString("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 2
-  });
-}
-
-function formatRatio(value) {
-  if (value === null || value === undefined) return "--";
-  return Number(value).toLocaleString("en-US", {
-    maximumFractionDigits: 1
-  });
-}
-
-function formatPERatio(row) {
-  if (row.pe_ratio !== null && row.pe_ratio !== undefined) return formatRatio(row.pe_ratio);
-  if (row.pe_note) return row.pe_note;
-  return "--";
-}
-
-function valueClass(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number === 0) return "";
-  return number > 0 ? "value-up" : "value-down";
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-}
-
-async function loadDashboard() {
-  dashboardSnapshot = await api("/api/dashboard");
-  selectedCategory = selectedCategory || "all";
-  renderDashboard();
-}
-
-function marketSource(snapshot) {
-  return snapshot.source_status.find((source) => source.name === "Market data") || {};
-}
-
-function fundamentalsLabel(snapshot) {
-  const source = marketSource(snapshot);
-  if (source.status === "live" && source.loaded_tickers) {
-    return `${source.fundamentals_loaded || 0}/${source.loaded_tickers}`;
-  }
-  return localizeValue("pending");
-}
-
-function numberOrZero(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function metricPercent(value, total) {
-  const denominator = numberOrZero(total);
-  if (!denominator) return 8;
-  return (numberOrZero(value) / denominator) * 100;
-}
-
-function metricFillStyle(percent) {
-  const clamped = Math.max(8, Math.min(100, Math.round(numberOrZero(percent))));
-  return `--metric-fill: ${clamped}%`;
-}
-
-function dashboardMetricCards(snapshot) {
-  const tracked = numberOrZero(snapshot.metrics.tracked_tickers);
-  const market = marketSource(snapshot);
-  const loaded = numberOrZero(market.loaded_tickers);
-  const fundamentalsLoaded = numberOrZero(market.fundamentals_loaded);
-  const fundamentalsTotal = loaded || tracked;
-  return [
+function renderMetrics() {
+  const snapshot = state.dashboard;
+  const metrics = snapshot?.metrics || {};
+  const total = metrics.tracked_tickers || snapshot?.rows?.length || 0;
+  const generatedAt = snapshot?.generated_at;
+  const cards = [
     {
       label: t("metrics.tracked"),
-      value: snapshot.metrics.tracked_tickers,
+      value: total || "--",
       detail: t("metrics.detail.tracked"),
-      tone: "cyan",
-      fill: 100
+      icon: "◇"
     },
     {
       label: t("metrics.priced"),
-      value: snapshot.metrics.priced_tickers,
-      detail: t("metrics.detail.priced"),
-      tone: "green",
-      fill: metricPercent(snapshot.metrics.priced_tickers, tracked)
-    },
-    {
-      label: t("metrics.fundamentals"),
-      value: fundamentalsLabel(snapshot),
-      detail: t("metrics.detail.fundamentals"),
-      tone: "blue",
-      fill: market.status === "live" ? metricPercent(fundamentalsLoaded, fundamentalsTotal) : 8
+      value: `${metrics.priced_tickers || 0}/${total || 0}`,
+      detail: t("metrics.detail.priced", { priced: metrics.priced_tickers || 0, total: total || 0 }),
+      icon: "●"
     },
     {
       label: t("metrics.core"),
-      value: snapshot.metrics.core_chokepoints,
+      value: metrics.core_chokepoints ?? "--",
       detail: t("metrics.detail.core"),
-      tone: "amber",
-      fill: metricPercent(snapshot.metrics.core_chokepoints, tracked)
+      icon: "◆"
     },
     {
       label: t("metrics.attention"),
-      value: snapshot.metrics.high_attention,
+      value: metrics.high_attention ?? "--",
       detail: t("metrics.detail.attention"),
-      tone: "red",
-      fill: metricPercent(snapshot.metrics.high_attention, tracked)
+      icon: "▲"
+    },
+    {
+      label: t("metrics.updated"),
+      value: generatedAt ? formatDateTime(generatedAt) : "--",
+      detail: t("metrics.detail.updated"),
+      icon: "↻"
     }
   ];
-}
-
-function sortLabel(field = sortField) {
-  return t(`sort.${field}`);
-}
-
-function sortDirectionGlyph() {
-  return sortDirection === "asc" ? "↑" : "↓";
-}
-
-function getSortValue(row, field) {
-  if (field === "ticker") return row.ticker || "";
-  const value = row[field];
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function compareRows(a, b) {
-  const aValue = getSortValue(a, sortField);
-  const bValue = getSortValue(b, sortField);
-  if (sortField === "ticker") {
-    return sortDirection === "asc"
-      ? String(aValue).localeCompare(String(bValue))
-      : String(bValue).localeCompare(String(aValue));
-  }
-  if (aValue === null && bValue === null) return a.ticker.localeCompare(b.ticker);
-  if (aValue === null) return 1;
-  if (bValue === null) return -1;
-  return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-}
-
-function rowMatchesSearch(row) {
-  const query = searchQuery.trim().toLowerCase();
-  if (!query) return true;
-  const haystack = [
-    row.ticker,
-    row.company,
-    localizeCompany(row),
-    row.category_label,
-    row.ai_layer,
-    row.role,
-    localizeRow(row, "ai_layer"),
-    localizeRow(row, "role")
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query);
-}
-
-function visibleRows(snapshot) {
-  const rows =
-    selectedCategory === "all"
-      ? snapshot.rows
-      : snapshot.rows.filter((row) => row.category === selectedCategory);
-  return rows.filter(rowMatchesSearch).sort(compareRows);
-}
-
-function persistDashboardState() {
-  localStorage.setItem(CATEGORY_KEY, selectedCategory);
-  localStorage.setItem(SEARCH_KEY, searchQuery);
-  localStorage.setItem(SORT_FIELD_KEY, sortField);
-  localStorage.setItem(SORT_DIRECTION_KEY, sortDirection);
-}
-
-function renderDashboard() {
-  const snapshot = dashboardSnapshot;
-  if (!snapshot) return;
-
-  if (dashboardSearch && dashboardSearch.value !== searchQuery) {
-    dashboardSearch.value = searchQuery;
-  }
-
-  refreshLabel.textContent = t("dashboard.refreshTarget", {
-    seconds: snapshot.refresh_interval_seconds
-  });
-  dataStatus.textContent = localizeValue(snapshot.data_status_label);
-  lastUpdated.textContent = t("dashboard.updated", {
-    date: formatDate(snapshot.generated_at)
-  });
-
-  dashboardMetrics.innerHTML = dashboardMetricCards(snapshot)
+  els.dashboardMetrics.innerHTML = cards
     .map(
-      (metric) => `
-        <article class="metric-card tone-${escapeHtml(metric.tone)}" style="${metricFillStyle(metric.fill)}">
-          <span>${escapeHtml(metric.label)}</span>
-          <strong>${escapeHtml(metric.value)}</strong>
-          <small>${escapeHtml(metric.detail)}</small>
-          <div class="metric-progress" aria-hidden="true"><i></i></div>
+      (card) => `
+        <article class="terminal-kpi">
+          <div>
+            <span>${escapeHtml(card.label)}</span>
+            <strong>${escapeHtml(card.value)}</strong>
+            <small>${escapeHtml(card.detail)}</small>
+          </div>
+          <i>${escapeHtml(card.icon)}</i>
         </article>`
     )
     .join("");
+}
 
-  document.querySelectorAll(".table-sort").forEach((button) => {
-    const active = button.dataset.sort === sortField;
-    button.classList.toggle("active", active);
-    button.dataset.direction = active ? sortDirectionGlyph() : "";
-    button.setAttribute(
-      "aria-label",
-      `${button.textContent.trim()} ${active ? sortDirectionGlyph() : ""}`.trim()
-    );
-  });
-
-  const tabs = [
-    { slug: "all", label: t("tabs.all"), count: snapshot.rows.length },
-    ...snapshot.categories.map((category) => ({
-      ...category,
-      label: localizeValue(category.label),
-      description: localizeValue(category.description)
-    }))
-  ];
-  categoryTabs.innerHTML = tabs
+function renderCategories() {
+  const categories = state.dashboard?.categories || [];
+  const allCount = state.dashboard?.rows?.length || 0;
+  const items = [{ slug: "all", label: t("tabs.all"), count: allCount }, ...categories];
+  els.categoryTabs.innerHTML = items
     .map(
-      (tab) => `
-        <button class="${tab.slug === selectedCategory ? "active" : ""}"
-          data-category="${escapeHtml(tab.slug)}"
-      title="${escapeHtml(tab.description || tab.label)}"
-          type="button">
-          <span>${escapeHtml(tab.label)}</span>
-          <small>${escapeHtml(tab.count)}</small>
+      (item) => `
+        <button class="${state.category === item.slug ? "active" : ""}" data-category="${escapeHtml(item.slug)}" type="button">
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.count ?? "")}</strong>
         </button>`
     )
     .join("");
-
-  const rows = visibleRows(snapshot);
-  tableStatus.textContent = t("dashboard.rowsShown", {
-    shown: rows.length,
-    total: snapshot.rows.length,
-    sort: `${sortLabel()} ${sortDirectionGlyph()}`
-  });
-
-  if (!rows.length) {
-    dashboardRows.innerHTML = `<p class="empty-table">${escapeHtml(
-      t("dashboard.noRows")
-    )}</p>`;
-  } else {
-    dashboardRows.innerHTML = rows
-      .map(
-        (row) => `
-          <article class="market-row" role="button" tabindex="0" data-ticker="${escapeHtml(row.ticker)}">
-            <div class="ticker-cell">
-              <strong>${escapeHtml(row.ticker)}</strong>
-              <span>${escapeHtml(localizeCompany(row))}</span>
-            </div>
-            <span class="price-cell">${escapeHtml(formatPriceWithCurrency(row))}</span>
-            <span class="change-cell">
-              <span class="change-pill ${escapeHtml(valueClass(row.change_percent))}">
-                ${escapeHtml(formatPercent(row.change_percent))}
-              </span>
-            </span>
-            <span class="number-cell">${escapeHtml(formatMarketCap(row.market_cap))}</span>
-            <span class="number-cell">${escapeHtml(formatCompactNumber(row.dollar_volume))}</span>
-            <span class="number-cell">${escapeHtml(formatPERatio(row))}</span>
-            <span class="role-cell">
-              <strong>${escapeHtml(localizeRow(row, "role"))}</strong>
-              <small>${escapeHtml(localizeRow(row, "latest_signal") || t("table.pending"))}</small>
-            </span>
-          </article>`
-      )
-      .join("");
-    dashboardRows.querySelectorAll(".market-row[data-ticker]").forEach((rowButton) => {
-      const openRow = () => {
-        renderTickerDrawer(rowButton.dataset.ticker);
-      };
-      rowButton.addEventListener("click", openRow);
-      rowButton.addEventListener("pointerup", openRow);
-      rowButton.addEventListener("mouseup", openRow);
-      rowButton.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          openRow();
-        }
-      });
-    });
-  }
-
-  if (activeDrawerTicker) {
-    renderTickerDrawer(activeDrawerTicker);
-  }
-
-  sourceStatus.innerHTML = snapshot.source_status
-    .map(
-      (source) => `
-        <article class="source-item ${escapeHtml(source.status)}">
-          <div>
-            <strong>${escapeHtml(localizeValue(source.name))}</strong>
-            <span>${escapeHtml(localizeSourceDetail(source))}</span>
-          </div>
-          <mark>${escapeHtml(localizeValue(source.status))}</mark>
-        </article>`
-    )
-    .join("");
 }
 
-function drawerMetric(label, value, className = "") {
-  return `
-    <article>
-      <span>${escapeHtml(label)}</span>
-      <strong class="${escapeHtml(className)}">${escapeHtml(value)}</strong>
-    </article>`;
-}
-
-const PRODUCT_PROFILE_OVERRIDES = {
-  NVDA: ["accelerator", "Blackwell AI accelerator"],
-  AMD: ["accelerator", "Instinct GPU accelerator"],
-  AVGO: ["network", "Custom AI ASIC"],
-  MRVL: ["network", "Electro-optical DSP"],
-  ANET: ["network", "AI Ethernet switch"],
-  ALAB: ["network", "PCIe/CXL retimer"],
-  CRDO: ["network", "Active electrical cable"],
-  MSFT: ["cloud", "Azure AI cloud rack"],
-  GOOGL: ["cloud", "TPU AI pod"],
-  AMZN: ["cloud", "Trainium AI cluster"],
-  META: ["cloud", "AI factory rack"],
-  ORCL: ["cloud", "GPU cloud capacity"],
-  NBIS: ["cloud", "AI cloud rack"],
-  TSM: ["foundry", "CoWoS advanced package"],
-  ASML: ["foundry", "EUV lithography module"],
-  AMAT: ["foundry", "Deposition tool module"],
-  LRCX: ["foundry", "Etch process chamber"],
-  KLAC: ["foundry", "Process-control sensor"],
-  "6857.T": ["foundry", "AI chip tester"],
-  "BESI.AS": ["foundry", "Hybrid bonding module"],
-  MU: ["memory", "HBM memory stack"],
-  "000660.KS": ["memory", "HBM memory stack"],
-  "005930.KS": ["memory", "HBM and DRAM stack"],
-  SNDK: ["memory", "AI eSSD storage stack"],
-  SIMO: ["memory", "NAND controller module"],
-  EWY: ["memory", "Korea memory basket"],
-  "4062.T": ["foundry", "ABF substrate panel"],
-  "3037.TW": ["foundry", "AI server PCB"],
-  "2802.T": ["foundry", "ABF film material"],
-  "ATS.VI": ["foundry", "IC substrate panel"],
-  AEHR: ["foundry", "Wafer-level test module"],
-  COHR: ["optics", "AI laser transmitter"],
-  LITE: ["optics", "Datacom optical engine"],
-  FN: ["optics", "800G optical module"],
-  GLW: ["optics", "Optical glass fiber"],
-  AAOI: ["optics", "AI optical transceiver"],
-  AXTI: ["optics", "InP substrate wafer"],
-  "SIVE.ST": ["optics", "DFB laser array"],
-  "SOI.PA": ["optics", "SOI photonics wafer"],
-  "IQE.L": ["optics", "Compound epitaxy wafer"],
-  TSEM: ["foundry", "Specialty foundry wafer"],
-  VRT: ["power", "Liquid cooling CDU"],
-  ETN: ["power", "Data-center switchgear"],
-  "SU.PA": ["power", "Power management module"],
-  NVT: ["power", "Electrical enclosure"],
-  MOD: ["power", "Cooling plate module"],
-  BE: ["power", "Onsite fuel-cell power"],
-  CEG: ["power", "Clean power supply"],
-  GEV: ["power", "Grid equipment module"],
-  PWR: ["power", "Transmission buildout"],
-  XLU: ["power", "Power utility basket"],
-  PLTR: ["software", "AI workflow platform"],
-  SNOW: ["software", "AI data cloud"],
-  DDOG: ["software", "Observability control plane"],
-  CRWD: ["software", "AI security platform"],
-  RDDT: ["software", "Data licensing node"],
-  FIG: ["software", "AI design workspace"]
-};
-
-const PRODUCT_TONE = {
-  accelerator: { accent: 0x67e8f9, secondary: 0x93c5fd },
-  cloud: { accent: 0x7dd3fc, secondary: 0xa78bfa },
-  foundry: { accent: 0xfcd34d, secondary: 0x67e8f9 },
-  memory: { accent: 0x6ee7b7, secondary: 0x93c5fd },
-  network: { accent: 0x67e8f9, secondary: 0x6ee7b7 },
-  optics: { accent: 0xf0abfc, secondary: 0x67e8f9 },
-  power: { accent: 0xfcd34d, secondary: 0x6ee7b7 },
-  software: { accent: 0xa78bfa, secondary: 0x67e8f9 }
-};
-
-function inferProductType(row) {
-  const combined = `${row.category || ""} ${row.ai_layer || ""} ${row.role || ""}`.toLowerCase();
-  if (combined.includes("memory") || combined.includes("hbm") || combined.includes("dram") || combined.includes("storage")) return "memory";
-  if (combined.includes("optical") || combined.includes("photon") || combined.includes("laser") || combined.includes("inp") || combined.includes("soi")) return "optics";
-  if (combined.includes("power") || combined.includes("cooling") || combined.includes("utility") || combined.includes("grid")) return "power";
-  if (combined.includes("software") || combined.includes("data") || combined.includes("security") || combined.includes("platform")) return "software";
-  if (combined.includes("foundry") || combined.includes("test") || combined.includes("packag") || combined.includes("substrate") || combined.includes("wafer")) return "foundry";
-  if (combined.includes("network") || combined.includes("asic") || combined.includes("ethernet") || combined.includes("serdes")) return "network";
-  if (combined.includes("cloud") || combined.includes("capex") || combined.includes("factory")) return "cloud";
-  return "accelerator";
-}
-
-function productProfile(row) {
-  const override = PRODUCT_PROFILE_OVERRIDES[row.ticker];
-  const type = override?.[0] || inferProductType(row);
-  const title = override?.[1] || localizeRow(row, "role") || localizeValue(row.category_label);
-  return {
-    type,
-    title,
-    subtitle: localizeCompany(row),
-    tone: PRODUCT_TONE[type] || PRODUCT_TONE.accelerator
-  };
-}
-
-function disposeObject3d(object) {
-  object.traverse((item) => {
-    item.geometry?.dispose?.();
-    if (Array.isArray(item.material)) {
-      item.material.forEach((material) => material.dispose?.());
-    } else {
-      item.material?.dispose?.();
-    }
-  });
-}
-
-function disposeProductScene() {
-  if (!activeProductScene) return;
-  activeProductScene.resizeObserver?.disconnect();
-  activeProductScene.cancel();
-  activeProductScene.dispose();
-  activeProductScene = null;
-}
-
-function productMaterial(color, emissive = 0x07131f, opacity = 1) {
-  return new THREE.MeshStandardMaterial({
-    color,
-    emissive,
-    emissiveIntensity: 0.28,
-    metalness: 0.64,
-    roughness: 0.28,
-    transparent: opacity < 1,
-    opacity
-  });
-}
-
-function edgeOverlay(mesh, color = 0x67e8f9) {
-  const edges = new THREE.EdgesGeometry(mesh.geometry);
-  return new THREE.LineSegments(
-    edges,
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.38 })
-  );
-}
-
-function addBox(group, size, position, material, edgeColor) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-  mesh.position.set(...position);
-  mesh.add(edgeOverlay(mesh, edgeColor));
-  group.add(mesh);
-  return mesh;
-}
-
-function addCylinder(group, radiusTop, radiusBottom, height, position, rotation, material, edgeColor, segments = 48) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
-    material
-  );
-  mesh.position.set(...position);
-  mesh.rotation.set(...rotation);
-  mesh.add(edgeOverlay(mesh, edgeColor));
-  group.add(mesh);
-  return mesh;
-}
-
-function buildProductObject(profile) {
-  const group = new THREE.Group();
-  const accent = profile.tone.accent;
-  const secondary = profile.tone.secondary;
-  const primary = productMaterial(accent, accent);
-  const secondaryMaterial = productMaterial(secondary, secondary);
-  const dark = productMaterial(0x111827, accent);
-  const glass = productMaterial(secondary, secondary, 0.48);
-
-  if (profile.type === "cloud") {
-    [-0.58, 0, 0.58].forEach((x, index) => {
-      addBox(group, [0.36, 1.36, 0.28], [x, 0, 0], dark, accent);
-      addBox(group, [0.24, 0.1, 0.32], [x, 0.43 - index * 0.12, 0.18], primary, accent);
-      addBox(group, [0.24, 0.1, 0.32], [x, 0.05 - index * 0.08, 0.18], secondaryMaterial, secondary);
-    });
-    addCylinder(group, 0.9, 0.9, 0.035, [0, -0.82, 0], [Math.PI / 2, 0, 0], glass, secondary);
-  } else if (profile.type === "memory") {
-    for (let i = 0; i < 6; i += 1) {
-      addBox(group, [1.5, 0.12, 0.95], [0, -0.36 + i * 0.16, 0], i % 2 ? dark : primary, accent);
-    }
-    addBox(group, [1.74, 0.05, 1.12], [0, -0.52, 0], secondaryMaterial, secondary);
-    addCylinder(group, 0.7, 0.7, 0.035, [0, 0.68, 0], [Math.PI / 2, 0, 0], glass, secondary);
-  } else if (profile.type === "optics") {
-    addCylinder(group, 0.18, 0.18, 1.9, [0, 0, 0], [0, 0, Math.PI / 2], glass, secondary);
-    addBox(group, [1.45, 0.34, 0.48], [0, 0, 0], dark, accent);
-    addBox(group, [0.28, 0.2, 0.64], [-0.52, 0, 0.02], primary, accent);
-    addBox(group, [0.28, 0.2, 0.64], [0.52, 0, 0.02], secondaryMaterial, secondary);
-    addCylinder(group, 0.24, 0.24, 0.08, [-0.94, 0, 0], [0, Math.PI / 2, 0], primary, accent);
-    addCylinder(group, 0.24, 0.24, 0.08, [0.94, 0, 0], [0, Math.PI / 2, 0], secondaryMaterial, secondary);
-  } else if (profile.type === "power") {
-    addCylinder(group, 0.5, 0.62, 0.9, [0, -0.1, 0], [0, 0, 0], dark, accent);
-    addCylinder(group, 0.78, 0.78, 0.08, [0, 0.44, 0], [0, 0, 0], primary, accent);
-    addCylinder(group, 0.88, 0.88, 0.04, [0, -0.6, 0], [0, 0, 0], secondaryMaterial, secondary);
-    for (let i = 0; i < 6; i += 1) {
-      const blade = addBox(group, [0.12, 0.68, 0.05], [0, 0.78, 0], primary, accent);
-      blade.rotation.z = (Math.PI * 2 * i) / 6;
-      blade.position.x = Math.cos(blade.rotation.z) * 0.32;
-      blade.position.y = 0.78 + Math.sin(blade.rotation.z) * 0.32;
-    }
-  } else if (profile.type === "software") {
-    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.72, 1), glass);
-    group.add(core, edgeOverlay(core, accent));
-    [[1.15, 0, 0], [-1.15, 0, 0], [0, 1.02, 0], [0, -1.02, 0], [0, 0, 1.05]].forEach((position, index) => {
-      const node = new THREE.Mesh(
-        new THREE.SphereGeometry(index === 0 ? 0.16 : 0.12, 24, 16),
-        index % 2 ? secondaryMaterial : primary
-      );
-      node.position.set(...position);
-      group.add(node);
-    });
-  } else if (profile.type === "foundry") {
-    addCylinder(group, 0.78, 0.78, 0.08, [0, 0, 0], [Math.PI / 2, 0, 0], glass, secondary);
-    addBox(group, [1.3, 0.18, 0.86], [0, 0.05, 0.14], dark, accent);
-    addBox(group, [0.58, 0.16, 0.46], [0, 0.22, 0.24], primary, accent);
-    addCylinder(group, 0.26, 0.26, 0.08, [-0.54, -0.04, 0.25], [Math.PI / 2, 0, 0], secondaryMaterial, secondary);
-    addCylinder(group, 0.26, 0.26, 0.08, [0.54, -0.04, 0.25], [Math.PI / 2, 0, 0], secondaryMaterial, secondary);
-  } else {
-    addBox(group, [1.46, 0.16, 1.05], [0, 0, 0], dark, accent);
-    addBox(group, [0.82, 0.08, 0.58], [0, 0.13, 0], primary, accent);
-    for (let i = 0; i < 8; i += 1) {
-      const x = -0.66 + i * 0.19;
-      addBox(group, [0.05, 0.08, 0.18], [x, -0.02, 0.64], secondaryMaterial, secondary);
-      addBox(group, [0.05, 0.08, 0.18], [x, -0.02, -0.64], secondaryMaterial, secondary);
-    }
-  }
-
-  return group;
-}
-
-function renderProductScene(row) {
-  disposeProductScene();
-  const stage = drawerBody.querySelector("#productStage");
-  const canvas = drawerBody.querySelector("#productCanvas");
-  if (!stage || !canvas) return;
-
-  const profile = productProfile(row);
-  stage.querySelector("[data-product-title]").textContent = profile.title;
-  stage.querySelector("[data-product-subtitle]").textContent = profile.subtitle;
-  stage.dataset.productType = profile.type;
-
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    alpha: true,
-    antialias: true,
-    preserveDrawingBuffer: true
-  });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(0, 0.35, 4.4);
-  scene.add(new THREE.AmbientLight(0x9fb7d5, 0.72));
-
-  const keyLight = new THREE.DirectionalLight(profile.tone.accent, 1.65);
-  keyLight.position.set(2.2, 2.4, 3);
-  scene.add(keyLight);
-  const rimLight = new THREE.PointLight(profile.tone.secondary, 1.2, 10);
-  rimLight.position.set(-2, -1, 2);
-  scene.add(rimLight);
-
-  const object = buildProductObject(profile);
-  object.rotation.x = -0.22;
-  object.rotation.y = 0.52;
-  scene.add(object);
-
-  let frameId = 0;
-  let hovered = false;
-  let dragging = false;
-  let lastX = 0;
-  let lastY = 0;
-  const velocity = { x: 0, y: 0.008 };
-
-  const sizeRenderer = () => {
-    const rect = stage.getBoundingClientRect();
-    const width = Math.max(260, Math.floor(rect.width));
-    const height = Math.max(240, Math.floor(rect.height));
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-  };
-
-  const resizeObserver = new ResizeObserver(sizeRenderer);
-  resizeObserver.observe(stage);
-  sizeRenderer();
-
-  const onPointerEnter = () => {
-    hovered = true;
-    stage.classList.add("is-hot");
-  };
-  const onPointerLeave = () => {
-    hovered = false;
-    dragging = false;
-    stage.classList.remove("is-hot", "is-dragging");
-  };
-  const onPointerDown = (event) => {
-    hovered = true;
-    dragging = true;
-    lastX = event.clientX;
-    lastY = event.clientY;
-    stage.classList.add("is-hot", "is-dragging");
-    canvas.setPointerCapture?.(event.pointerId);
-  };
-  const onPointerMove = (event) => {
-    if (!dragging) return;
-    const dx = event.clientX - lastX;
-    const dy = event.clientY - lastY;
-    lastX = event.clientX;
-    lastY = event.clientY;
-    velocity.y = dx * 0.004;
-    velocity.x = dy * 0.003;
-    object.rotation.y += velocity.y;
-    object.rotation.x += velocity.x;
-  };
-  const onPointerUp = () => {
-    dragging = false;
-    stage.classList.remove("is-dragging");
-  };
-
-  stage.addEventListener("pointerenter", onPointerEnter);
-  stage.addEventListener("pointerleave", onPointerLeave);
-  canvas.addEventListener("pointerenter", onPointerEnter);
-  canvas.addEventListener("pointerleave", onPointerLeave);
-  canvas.addEventListener("pointerdown", onPointerDown);
-  canvas.addEventListener("pointermove", onPointerMove);
-  canvas.addEventListener("pointerup", onPointerUp);
-  canvas.addEventListener("pointercancel", onPointerUp);
-
-  const animate = () => {
-    object.rotation.y += hovered ? 0.014 : 0.006;
-    object.rotation.x += dragging ? 0 : velocity.x * 0.18;
-    velocity.x *= 0.92;
-    velocity.y *= 0.92;
-    object.scale.setScalar(hovered ? 1.05 : 1);
-    renderer.render(scene, camera);
-    frameId = requestAnimationFrame(animate);
-  };
-  animate();
-
-  activeProductScene = {
-    resizeObserver,
-    cancel: () => cancelAnimationFrame(frameId),
-    dispose: () => {
-      stage.removeEventListener("pointerenter", onPointerEnter);
-      stage.removeEventListener("pointerleave", onPointerLeave);
-      canvas.removeEventListener("pointerenter", onPointerEnter);
-      canvas.removeEventListener("pointerleave", onPointerLeave);
-      canvas.removeEventListener("pointerdown", onPointerDown);
-      canvas.removeEventListener("pointermove", onPointerMove);
-      canvas.removeEventListener("pointerup", onPointerUp);
-      canvas.removeEventListener("pointercancel", onPointerUp);
-      disposeObject3d(object);
-      renderer.dispose();
-    }
-  };
-}
-
-function renderTickerDrawer(ticker) {
-  const row = dashboardSnapshot?.rows.find((item) => item.ticker === ticker);
-  if (!row) return;
-  disposeProductScene();
-  activeDrawerTicker = ticker;
-  drawerBody.innerHTML = `
-    <p class="drawer-kicker">${escapeHtml(localizeValue(row.category_label))}</p>
-    <div class="drawer-title">
-      <h2 id="drawerTitle">${escapeHtml(row.ticker)}</h2>
-      <span>${escapeHtml(localizeCompany(row))}</span>
-    </div>
-    <div class="drawer-metrics">
-      ${drawerMetric(t("table.price"), formatPriceWithCurrency(row))}
-      ${drawerMetric(
-        t("table.change"),
-        formatPercent(row.change_percent),
-        valueClass(row.change_percent)
-      )}
-      ${drawerMetric(t("table.marketCap"), formatMarketCap(row.market_cap))}
-      ${drawerMetric(t("table.dollarVolume"), formatCompactNumber(row.dollar_volume))}
-      ${drawerMetric(t("table.pe"), formatPERatio(row))}
-      ${drawerMetric(t("drawer.updated"), formatDate(row.market_updated_at))}
-    </div>
-    <section class="drawer-section">
-      <span>${escapeHtml(t("drawer.positioning"))}</span>
-      <p>${escapeHtml(localizeRow(row, "ai_layer"))}</p>
-    </section>
-    <section class="drawer-section">
-      <span>${escapeHtml(t("drawer.aiRole"))}</span>
-      <p>${escapeHtml(localizeRow(row, "role"))}</p>
-    </section>
-    <section class="drawer-section">
-      <span>${escapeHtml(t("drawer.latestSignal"))}</span>
-      <p>${escapeHtml(localizeRow(row, "latest_signal"))}</p>
-    </section>
-    ${
-      row.source_url
-        ? `<section class="drawer-section">
-            <span>${escapeHtml(t("drawer.source"))}</span>
-            <p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(row.source_url)}</a></p>
-          </section>`
-        : ""
-    }
-    <section class="drawer-section product-section">
-      <span>${escapeHtml(t("product3d.eyebrow"))}</span>
-      <div id="productStage" class="product-stage" data-product-type="">
-        <div class="product-stage-copy">
-          <strong data-product-title>--</strong>
-          <small data-product-subtitle>--</small>
-        </div>
-        <canvas id="productCanvas" class="product-canvas" aria-label="${escapeHtml(t("product3d.eyebrow"))}"></canvas>
-        <p class="product-hint">${escapeHtml(t("product3d.hint"))}</p>
-      </div>
-    </section>`;
-  tickerDrawer.classList.remove("hidden");
-  tickerDrawer.setAttribute("aria-hidden", "false");
-  renderProductScene(row);
-}
-
-function closeTickerDrawer() {
-  activeDrawerTicker = null;
-  disposeProductScene();
-  tickerDrawer.classList.add("hidden");
-  tickerDrawer.setAttribute("aria-hidden", "true");
-}
-
-async function loadApp(existingMe) {
-  appConfig = await api("/api/config");
-  const me = existingMe || (await api("/api/me"));
-  showSignedIn(me);
-  if (!accountEmail || !subscriptionState) {
-    await loadFeed();
-    updatePushStatus();
-    return;
-  }
-  accountEmail.textContent = me.email;
-
-  let subscriptionTitle = t("account.pending");
-  let subscriptionDetail = t("account.waiting");
-  if (me.is_admin) {
-    subscriptionTitle = t("account.admin");
-    subscriptionDetail = t("account.noExpiry");
-  } else if (me.subscription.active) {
-    subscriptionTitle = t("account.active");
-    subscriptionDetail = me.subscription.expires_at
-      ? new Date(me.subscription.expires_at).toLocaleString(
-          currentLanguage === "zh" ? "zh-Hans" : "en-US"
-        )
-      : t("account.noExpiry");
-  }
-  subscriptionState.innerHTML = `<strong>${escapeHtml(
-    subscriptionTitle
-  )}</strong><span>${escapeHtml(subscriptionDetail)}</span>`;
-
-  await Promise.allSettled([loadLists(), loadPayment(), loadFeed()]);
-  updatePushStatus();
-}
-
-async function loadLists() {
-  if (!listBox) return;
-  const lists = await api("/api/lists");
-  listBox.innerHTML = lists
+function renderSources() {
+  const sources = state.dashboard?.source_status || [];
+  els.sourceStatus.innerHTML = sources
     .map(
       (item) => `
-        <article class="list-item">
-          <div>
-            <strong>${escapeHtml(item.name)}</strong>
-            <span>${escapeHtml(localizeValue(item.description))}</span>
-          </div>
-          <mark>${escapeHtml(
-            item.subscription_active
-              ? t("lists.active")
-              : item.public_access
-                ? t("lists.public")
-                : t("lists.locked")
-          )}</mark>
+        <article class="terminal-source ${escapeHtml(item.status || "pending")}">
+          <span>${escapeHtml(item.name)}</span>
+          <strong>${escapeHtml(item.status || "pending")}</strong>
+          <small>${escapeHtml(item.detail || "")}</small>
         </article>`
     )
     .join("");
 }
 
-async function loadPayment() {
-  if (!paymentBox) return;
-  const payment = await api("/api/payments/current");
-  if (payment.admin_bypass) {
-    paymentBox.innerHTML = `
-      <p class="status-line">${escapeHtml(t("payment.adminBypass"))}</p>
-      <dl>
-        <div><dt>TRC20</dt><dd>${moneyAddress(payment.trc20_address)}</dd></div>
-        <div><dt>ERC20</dt><dd>${moneyAddress(payment.erc20_address)}</dd></div>
-      </dl>`;
+function renderStatus() {
+  const snapshot = state.dashboard;
+  const status = snapshot?.data_status || "provider_pending";
+  els.dataStatus.textContent = t(`status.${status}`) || snapshot?.data_status_label || status;
+  els.lastUpdated.textContent = snapshot?.generated_at ? formatDateTime(snapshot.generated_at) : "--";
+  els.refreshLabel.textContent = snapshot?.refresh_interval_seconds
+    ? t("dashboard.refreshTarget", { seconds: snapshot.refresh_interval_seconds })
+    : "--";
+}
+
+function renderTable() {
+  const rows = currentRows();
+  const total = state.dashboard?.rows?.length || 0;
+  if (!rows.length) {
+    els.dashboardRows.innerHTML = `<div class="terminal-empty-row">${escapeHtml(t("dashboard.noRows"))}</div>`;
+  } else {
+    els.dashboardRows.innerHTML = rows
+      .map((row) => {
+        const status = rowStatus(row);
+        const change = Number(row.change_percent);
+        const tone = Number.isFinite(change) && change > 0 ? "up" : Number.isFinite(change) && change < 0 ? "down" : "flat";
+        return `
+          <article class="terminal-table-row terminal-data-row" role="row" tabindex="0" data-ticker="${escapeHtml(row.ticker)}">
+            <div class="ticker-cell sticky-col">
+              <strong>${escapeHtml(row.ticker)}</strong>
+              <small>${escapeHtml(row.company || "")}</small>
+            </div>
+            <div class="number-cell">${escapeHtml(formatNumber(row.price, 2))}</div>
+            <div class="number-cell ${tone}">${escapeHtml(formatPercent(row.change_percent))}</div>
+            <div class="number-cell">${escapeHtml(formatCompact(row.dollar_volume, "$"))}</div>
+            <div class="number-cell">${escapeHtml(formatCompact(row.market_cap, "$"))}</div>
+            <div class="number-cell">${escapeHtml(row.pe_note || formatNumber(row.pe_ratio, 1))}</div>
+            <div><span class="soft-badge">${escapeHtml(row.category_label || row.ai_layer || "--")}</span></div>
+            <div class="role-cell">
+              <strong>${escapeHtml(row.role || "--")}</strong>
+              <small>${escapeHtml(row.latest_signal || "")}</small>
+            </div>
+            <div class="source-cell">
+              <span class="data-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
+              <small>${escapeHtml(row.market_provider || row.fundamentals_provider || "--")}</small>
+            </div>
+          </article>`;
+      })
+      .join("");
+  }
+
+  els.tableStatus.textContent = t("dashboard.rowsShown", {
+    shown: rows.length,
+    total,
+    sort: t(`sort.${state.sortField}`)
+  });
+
+  document.querySelectorAll(".table-sort").forEach((button) => {
+    const active = button.dataset.sort === state.sortField;
+    button.classList.toggle("active", active);
+    button.dataset.direction = active ? state.sortDirection : "";
+  });
+}
+
+function renderFeed() {
+  const items = state.feed.filter((item) => {
+    if (state.feedFilter === "unread") return !state.readAlerts.has(item.id);
+    if (state.feedFilter === "saved") return state.savedAlerts.has(item.id);
+    return true;
+  });
+  document.querySelectorAll("[data-feed-filter]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.feedFilter === state.feedFilter);
+  });
+  if (!items.length) {
+    els.feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.empty"))}</p>`;
     return;
   }
-  if (payment.member_active) {
-    paymentBox.innerHTML = `
-      <p class="status-line">${escapeHtml(t("payment.memberActive"))}</p>
-      <dl>
-        <div><dt>${escapeHtml(t("account.active"))}</dt><dd>${escapeHtml(
-      formatDate(payment.expires_at)
-    )}</dd></div>
-        <div><dt>TRC20</dt><dd>${moneyAddress(payment.trc20_address)}</dd></div>
-        <div><dt>ERC20</dt><dd>${moneyAddress(payment.erc20_address)}</dd></div>
-      </dl>`;
-    return;
+  els.feedBox.innerHTML = items
+    .map((item) => {
+      const read = state.readAlerts.has(item.id);
+      const saved = state.savedAlerts.has(item.id);
+      const tickers = (item.tickers || []).slice(0, 6);
+      return `
+        <article class="terminal-feed-card ${read ? "read" : ""}" data-alert-id="${escapeHtml(item.id)}">
+          <div class="feed-card-head">
+            <strong>${escapeHtml(item.title || "Untitled")}</strong>
+            <time>${escapeHtml(formatDateTime(item.created_at))}</time>
+          </div>
+          <p>${escapeHtml(item.notification_text || "")}</p>
+          <div class="feed-tickers">
+            ${tickers.map((ticker) => `<button type="button" data-feed-ticker="${escapeHtml(ticker)}">$${escapeHtml(ticker)}</button>`).join("")}
+          </div>
+          <div class="feed-actions">
+            <button type="button" data-feed-read="${escapeHtml(item.id)}">${escapeHtml(read ? t("alerts.read") : t("alerts.markRead"))}</button>
+            <button type="button" data-feed-save="${escapeHtml(item.id)}">${escapeHtml(saved ? t("alerts.unsave") : t("alerts.save"))}</button>
+            ${item.source_url ? `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(t("alerts.source"))}</a>` : ""}
+          </div>
+        </article>`;
+    })
+    .join("");
+}
+
+function renderAll() {
+  applyCopy();
+  renderStatus();
+  renderMetrics();
+  renderCategories();
+  renderSources();
+  renderTable();
+  renderFeed();
+}
+
+function openDrawer(row) {
+  const status = rowStatus(row);
+  const low = Number(row.low);
+  const high = Number(row.high);
+  const price = Number(row.price);
+  const rangePct = Number.isFinite(low) && Number.isFinite(high) && high > low && Number.isFinite(price)
+    ? Math.max(0, Math.min(100, ((price - low) / (high - low)) * 100))
+    : null;
+  els.drawerBody.innerHTML = `
+    <div class="drawer-title">
+      <div>
+        <span class="eyebrow">${escapeHtml(row.category_label || row.ai_layer || "")}</span>
+        <h2 id="drawerTitle">${escapeHtml(row.ticker)} <small>${escapeHtml(row.company || "")}</small></h2>
+      </div>
+      <span class="data-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
+    </div>
+    <div class="drawer-metrics terminal-drawer-grid">
+      ${metricBlock(t("table.price"), formatNumber(row.price, 2))}
+      ${metricBlock(t("table.change"), formatPercent(row.change_percent))}
+      ${metricBlock(t("table.marketCap"), formatCompact(row.market_cap, "$"))}
+      ${metricBlock(t("table.pe"), row.pe_note || formatNumber(row.pe_ratio, 1))}
+      ${metricBlock(t("table.dollarVolume"), formatCompact(row.dollar_volume, "$"))}
+      ${metricBlock(t("table.source"), row.market_provider || row.fundamentals_provider || "--")}
+    </div>
+    <section class="drawer-section">
+      <h3>${escapeHtml(t("drawer.position"))}</h3>
+      <p>${escapeHtml(row.role || "--")}</p>
+      <small>${escapeHtml(row.focus || "")} · ${escapeHtml(row.tier || "")}</small>
+    </section>
+    <section class="drawer-section">
+      <h3>${escapeHtml(t("drawer.signal"))}</h3>
+      <p>${escapeHtml(row.latest_signal || "--")}</p>
+    </section>
+    <section class="drawer-section">
+      <h3>${escapeHtml(t("drawer.range"))}</h3>
+      <div class="range-bar"><i style="left:${rangePct ?? 50}%"></i></div>
+      <div class="range-labels">
+        <span>L ${escapeHtml(formatNumber(row.low, 2))}</span>
+        <span>H ${escapeHtml(formatNumber(row.high, 2))}</span>
+      </div>
+    </section>
+    <section class="drawer-section drawer-actions">
+      ${row.source_url ? `<a class="terminal-button" href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(t("drawer.source"))}</a>` : `<span class="muted">${escapeHtml(t("drawer.noSource"))}</span>`}
+      <span class="muted">${escapeHtml(formatDateTime(row.market_updated_at))}</span>
+    </section>`;
+  els.tickerDrawer.classList.remove("hidden");
+  els.tickerDrawer.setAttribute("aria-hidden", "false");
+}
+
+function metricBlock(label, value) {
+  return `<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`;
+}
+
+function closeDrawer() {
+  els.tickerDrawer.classList.add("hidden");
+  els.tickerDrawer.setAttribute("aria-hidden", "true");
+}
+
+async function loadUser() {
+  try {
+    const user = await api("/api/me");
+    state.user = user;
+    els.logoutBtn.classList.remove("hidden");
+    if (user.is_admin) els.adminLink.classList.remove("hidden");
+  } catch {
+    state.user = null;
   }
-  paymentBox.innerHTML = `
-    <dl>
-      <div><dt>${escapeHtml(t("payment.amount"))}</dt><dd>${escapeHtml(
-    payment.amount_usdt
-  )} USDT / ${escapeHtml(t("payment.month"))}</dd></div>
-      <div><dt>${escapeHtml(t("payment.noteCode"))}</dt><dd><code>${escapeHtml(
-    payment.payment_code
-  )}</code></dd></div>
-      <div><dt>TRC20</dt><dd>${moneyAddress(payment.trc20_address)}</dd></div>
-      <div><dt>ERC20</dt><dd>${moneyAddress(payment.erc20_address)}</dd></div>
-    </dl>`;
+}
+
+async function loadDashboard() {
+  try {
+    state.dashboard = await api("/api/dashboard");
+  } catch (error) {
+    els.dataStatus.textContent = t("dashboard.loadFailed");
+    els.tableStatus.textContent = error.message || t("dashboard.loadFailed");
+  }
 }
 
 async function loadFeed() {
-  renderFeedLoading();
   try {
-    const feed = await api(`/api/feed?lang=${encodeURIComponent(currentLanguage)}`);
-    if (!feed.length) {
-      feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.empty"))}</p>`;
+    state.feed = await api(`/api/feed?limit=40&lang=${encodeURIComponent(state.language)}`);
+  } catch {
+    els.feedBox.innerHTML = `<p class="empty">${escapeHtml(t("alerts.failed"))}</p>`;
+  }
+}
+
+function bindEvents() {
+  els.languageToggle.addEventListener("click", async () => {
+    state.language = state.language === "zh" ? "en" : "zh";
+    localStorage.setItem(LANGUAGE_KEY, state.language);
+    await loadFeed();
+    renderAll();
+  });
+
+  els.logoutBtn.addEventListener("click", async () => {
+    await api("/api/auth/logout", { method: "POST" });
+    window.location.reload();
+  });
+
+  els.dashboardSearch.value = state.search;
+  els.dashboardSearch.addEventListener("input", () => {
+    state.search = els.dashboardSearch.value;
+    localStorage.setItem(SEARCH_KEY, state.search);
+    renderTable();
+  });
+
+  els.rowQualityFilter.value = state.quality;
+  els.rowQualityFilter.addEventListener("change", () => {
+    state.quality = els.rowQualityFilter.value;
+    localStorage.setItem(QUALITY_KEY, state.quality);
+    renderTable();
+  });
+
+  els.clearFiltersBtn.addEventListener("click", () => {
+    state.category = "all";
+    state.search = "";
+    state.quality = "all";
+    els.dashboardSearch.value = "";
+    els.rowQualityFilter.value = "all";
+    localStorage.setItem(CATEGORY_KEY, state.category);
+    localStorage.setItem(SEARCH_KEY, state.search);
+    localStorage.setItem(QUALITY_KEY, state.quality);
+    renderAll();
+  });
+
+  els.categoryTabs.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-category]");
+    if (!button) return;
+    state.category = button.dataset.category;
+    localStorage.setItem(CATEGORY_KEY, state.category);
+    renderCategories();
+    renderTable();
+  });
+
+  document.addEventListener("click", (event) => {
+    const sortButton = event.target.closest(".table-sort[data-sort]");
+    if (sortButton) {
+      const field = sortButton.dataset.sort;
+      if (state.sortField === field) {
+        state.sortDirection = state.sortDirection === "desc" ? "asc" : "desc";
+      } else {
+        state.sortField = field;
+        state.sortDirection = field === "ticker" || field === "category_label" ? "asc" : "desc";
+      }
+      localStorage.setItem(SORT_FIELD_KEY, state.sortField);
+      localStorage.setItem(SORT_DIRECTION_KEY, state.sortDirection);
+      renderTable();
       return;
     }
-    feedBox.innerHTML = feed
-      .map(
-        (item) => `
-          <article class="alert-card" id="alert-${escapeHtml(item.id)}">
-            <header>
-              <h3>${escapeHtml(item.title)}</h3>
-              <time>${formatDate(item.created_at)}</time>
-            </header>
-            <p>${escapeHtml(item.notification_text)}</p>
-            <ul>${item.bullets
-              .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
-              .join("")}</ul>
-            <div class="ticker-row">${item.tickers
-              .map((ticker) => `<span>${escapeHtml(ticker)}</span>`)
-              .join("")}</div>
-            <p class="why">${escapeHtml(item.why_it_matters)}</p>
-            <a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">
-              ${escapeHtml(t("alerts.viewSource"))}
-            </a>
-            <small>${escapeHtml(item.disclaimer)}</small>
-          </article>`
-      )
-      .join("");
-  } catch {
-    renderFeedError();
-  }
+
+    const rowEl = event.target.closest(".terminal-data-row[data-ticker]");
+    if (rowEl) {
+      const row = (state.dashboard?.rows || []).find((item) => item.ticker === rowEl.dataset.ticker);
+      if (row) openDrawer(row);
+      return;
+    }
+
+    const feedFilter = event.target.closest("[data-feed-filter]");
+    if (feedFilter) {
+      state.feedFilter = feedFilter.dataset.feedFilter;
+      localStorage.setItem(FEED_FILTER_KEY, state.feedFilter);
+      renderFeed();
+      return;
+    }
+
+    const readButton = event.target.closest("[data-feed-read]");
+    if (readButton) {
+      state.readAlerts.add(readButton.dataset.feedRead);
+      writeSet(READ_ALERTS_KEY, state.readAlerts);
+      renderFeed();
+      return;
+    }
+
+    const saveButton = event.target.closest("[data-feed-save]");
+    if (saveButton) {
+      const id = saveButton.dataset.feedSave;
+      if (state.savedAlerts.has(id)) state.savedAlerts.delete(id);
+      else state.savedAlerts.add(id);
+      writeSet(SAVED_ALERTS_KEY, state.savedAlerts);
+      renderFeed();
+      return;
+    }
+
+    const feedTicker = event.target.closest("[data-feed-ticker]");
+    if (feedTicker) {
+      state.search = feedTicker.dataset.feedTicker;
+      els.dashboardSearch.value = state.search;
+      localStorage.setItem(SEARCH_KEY, state.search);
+      renderTable();
+    }
+  });
+
+  els.dashboardRows.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const rowEl = event.target.closest(".terminal-data-row[data-ticker]");
+    if (!rowEl) return;
+    const row = (state.dashboard?.rows || []).find((item) => item.ticker === rowEl.dataset.ticker);
+    if (row) openDrawer(row);
+  });
+
+  els.drawerClose.addEventListener("click", closeDrawer);
+  els.tickerDrawer.addEventListener("click", (event) => {
+    if (event.target.matches("[data-drawer-close]")) closeDrawer();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeDrawer();
+  });
 }
 
-function updatePushStatus() {
-  if (!pushStatus) return;
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    pushStatus.textContent = t("push.unsupported");
-    return;
+function visitorId() {
+  let value = localStorage.getItem(VISITOR_KEY);
+  if (!value) {
+    value = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    localStorage.setItem(VISITOR_KEY, value);
   }
-  const installed =
-    window.navigator.standalone === true ||
-    window.matchMedia("(display-mode: standalone)").matches;
-  pushStatus.textContent = installed ? t("push.installed") : t("push.installFirst");
+  return value;
 }
 
-async function enablePush() {
-  if (!pushStatus) return;
-  if (!appConfig.vapid_public_key) {
-    pushStatus.textContent = t("push.noVapid");
-    return;
-  }
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    pushStatus.textContent = t("push.denied");
-    return;
-  }
-  const registration = await navigator.serviceWorker.register("/sw.js");
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(appConfig.vapid_public_key)
-  });
-  await api("/api/push/subscribe", {
-    method: "POST",
-    body: JSON.stringify({ subscription })
-  });
-  pushStatus.textContent = t("push.enabled");
+function sendAnalytics(eventType, durationSeconds = 0) {
+  const payload = {
+    visitor_id: visitorId(),
+    event_type: eventType,
+    path: window.location.pathname,
+    duration_seconds: Math.round(durationSeconds),
+    language: state.language,
+    viewport: `${window.innerWidth}x${window.innerHeight}`
+  };
+  navigator.sendBeacon?.("/api/analytics/event", new Blob([JSON.stringify(payload)], { type: "application/json" }));
 }
 
-async function rerenderLanguageSensitiveSections() {
-  applyStaticCopy();
-  renderDashboard();
-  if (currentUser) {
-    await loadApp(currentUser);
-  } else {
-    await loadFeed();
-    updatePushStatus();
-  }
+async function init() {
+  applyCopy();
+  bindEvents();
+  sendAnalytics("pageview");
+  await Promise.all([loadUser(), loadDashboard(), loadFeed()]);
+  renderAll();
+  const startedAt = Date.now();
+  window.addEventListener("beforeunload", () => {
+    sendAnalytics("heartbeat", (Date.now() - startedAt) / 1000);
+  });
 }
 
-categoryTabs.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-category]");
-  if (!button) return;
-  selectedCategory = button.dataset.category;
-  persistDashboardState();
-  renderDashboard();
-});
-
-dashboardSearch.addEventListener("input", (event) => {
-  searchQuery = event.target.value;
-  persistDashboardState();
-  renderDashboard();
-});
-
-document.querySelector(".market-table-header").addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-sort]");
-  if (!button) return;
-  const nextField = button.dataset.sort;
-  if (sortField === nextField) {
-    sortDirection = sortDirection === "asc" ? "desc" : "asc";
-  } else {
-    sortField = nextField;
-    sortDirection = nextField === "ticker" ? "asc" : "desc";
-  }
-  persistDashboardState();
-  renderDashboard();
-});
-
-dashboardRows.addEventListener("click", (event) => {
-  const row = event.target.closest(".market-row[data-ticker]");
-  if (!row) return;
-  renderTickerDrawer(row.dataset.ticker);
-});
-
-drawerClose.addEventListener("click", closeTickerDrawer);
-tickerDrawer.addEventListener("click", (event) => {
-  if (event.target.matches("[data-drawer-close]")) {
-    closeTickerDrawer();
-  }
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !tickerDrawer.classList.contains("hidden")) {
-    closeTickerDrawer();
-  }
-});
-
-languageToggle.addEventListener("click", () => {
-  currentLanguage = currentLanguage === "zh" ? "en" : "zh";
-  localStorage.setItem(LANGUAGE_KEY, currentLanguage);
-  rerenderLanguageSensitiveSections();
-});
-
-loginForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = new FormData(loginForm);
-  const email = String(form.get("email") || "").trim().toLowerCase();
-  if (email) {
-    localStorage.setItem(LAST_EMAIL_KEY, email);
-  }
-  loginMessage.textContent = t("auth.sending");
-  try {
-    const result = await api("/api/auth/request", {
-      method: "POST",
-      body: JSON.stringify(Object.fromEntries(form.entries()))
-    });
-    loginMessage.innerHTML = result.dev_magic_link
-      ? `${escapeHtml(t("auth.devLink"))}<a href="${escapeHtml(
-          result.dev_magic_link
-        )}">${escapeHtml(t("auth.openLogin"))}</a>`
-      : t("auth.sent");
-  } catch {
-    loginMessage.textContent = t("auth.failed");
-  }
-});
-
-enablePushBtn?.addEventListener("click", enablePush);
-testPushBtn?.addEventListener("click", async () => {
-  pushStatus.textContent = t("push.testing");
-  const result = await api("/api/push/test", { method: "POST" });
-  pushStatus.textContent = t("push.testDone", {
-    sent: result.sent,
-    failed: result.failed
-  });
-});
-logoutBtn.addEventListener("click", async () => {
-  await api("/api/auth/logout", { method: "POST" });
-  location.reload();
-});
-
-applyStaticCopy();
-startAnalytics();
-loadDashboard().catch(() => {
-  dataStatus.textContent = t("dashboard.unavailable");
-});
-window.setInterval(() => {
-  loadDashboard().catch(() => {
-    dataStatus.textContent = t("dashboard.unavailable");
-  });
-}, 15_000);
-
-api("/api/me")
-  .then(loadApp)
-  .catch(() => showSignedOut());
+init();

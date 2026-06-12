@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import re
 import json
 import logging
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,12 +14,13 @@ from app.models import AlertSummary
 
 logger = logging.getLogger(__name__)
 
-LOCALIZATION_CACHE_KEY = "feed_zh_v4"
+LOCALIZATION_CACHE_KEY = "feed_zh_v5"
 LOCALIZATION_ROOT_KEY = "_serenity_localizations"
 TICKER_RE = re.compile(r"\$([A-Za-z][A-Za-z0-9.]{0,9})")
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 URL_RE = re.compile(r"https?://\S+")
 HANDLE_RE = re.compile(r"@\w+:?\s*")
+MOJIBAKE_RE = re.compile(r"(杩|鎴|鐪|浠|鈥|檚|锛|銆|€\?)")
 ENGLISH_RESIDUE_RE = re.compile(
     r"\b("
     r"we(?:'re| are) about to see|this is what it'?s like|did you listen|"
@@ -36,10 +37,6 @@ COMMON_ENGLISH_WORD_RE = re.compile(
     r"this|what|like|deserve|special|listen|anon)\b",
     re.IGNORECASE,
 )
-GENERIC_TITLE_RE = re.compile(
-    r"(serenity|alerts?|新帖|提醒|总结|summary|new post)",
-    re.IGNORECASE,
-)
 
 
 class FeedLocalizationItem(BaseModel):
@@ -48,6 +45,7 @@ class FeedLocalizationItem(BaseModel):
     notification_text: str = Field(max_length=500)
     bullets: list[str] = Field(default_factory=list, max_length=3)
     why_it_matters: str = Field(max_length=400)
+    risks: list[str] = Field(default_factory=list, max_length=3)
 
 
 class FeedLocalizationBatch(BaseModel):
@@ -56,6 +54,10 @@ class FeedLocalizationBatch(BaseModel):
 
 def has_chinese(text: str) -> bool:
     return bool(CJK_RE.search(text or ""))
+
+
+def has_mojibake(text: str) -> bool:
+    return bool(MOJIBAKE_RE.search(text or ""))
 
 
 def source_text(summary: AlertSummary) -> str:
@@ -92,13 +94,23 @@ def cache_zh(summary: AlertSummary, payload: dict[str, Any]) -> None:
         "notification_text": str(payload.get("notification_text") or ""),
         "bullets": list(payload.get("bullets") or [])[:3],
         "why_it_matters": str(payload.get("why_it_matters") or ""),
+        "risks": list(payload.get("risks") or [])[:3],
     }
     raw_json[LOCALIZATION_ROOT_KEY] = root
     summary.post.raw_json = raw_json
 
 
 def existing_chinese_payload(summary: AlertSummary) -> dict[str, Any] | None:
-    if not has_chinese(summary.notification_text or ""):
+    text = " ".join(
+        [
+            summary.title or "",
+            summary.notification_text or "",
+            " ".join(summary.bullets or []),
+            summary.why_it_matters or "",
+            " ".join(summary.risks or []),
+        ]
+    )
+    if has_mojibake(text) or not has_chinese(text):
         return None
     if not title_quality_ok(summary.title):
         return None
@@ -107,34 +119,47 @@ def existing_chinese_payload(summary: AlertSummary) -> dict[str, Any] | None:
         "notification_text": summary.notification_text,
         "bullets": summary.bullets or [],
         "why_it_matters": summary.why_it_matters or "",
+        "risks": summary.risks or [],
     }
 
 
 def _tickers(text: str, fallback: list[str] | None = None) -> list[str]:
     found = {match.upper() for match in TICKER_RE.findall(text or "")}
-    found.update(str(ticker).strip().lstrip("$").upper() for ticker in fallback or [] if ticker)
+    found.update(
+        str(ticker).strip().lstrip("$").upper()
+        for ticker in fallback or []
+        if ticker
+    )
     dotted_bases = {ticker.split(".", 1)[0] for ticker in found if "." in ticker}
     found = {ticker for ticker in found if "." in ticker or ticker not in dotted_bases}
     return sorted(found)
 
 
-def _keyword_points(text: str) -> list[str]:
-    lower = text.lower()
-    points = []
-    keyword_map = [
-        (("valuation", "valued", "undervalued", "cheap"), "估值或低估逻辑"),
-        (("beneficiary", "benefit", "winner"), "潜在受益标的"),
-        (("index inclusion", "nasdaq", "msci", "vanguard", "blackrock"), "指数纳入或机构资金流"),
-        (("institutional inflow", "inflow"), "机构资金流入预期"),
-        (("early", "extremely early"), "行情或基本面仍处早期阶段的判断"),
-        (("netflix special", "deserve my own"), "作者用调侃语气强调关注度"),
-        (("lightmatter", "celestial", "ayar", "lighthorse"), "硅光或光互连可比公司线索"),
-        (("subscribe", "followers", "thank"), "账号运营或订阅进展"),
-    ]
-    for keywords, label in keyword_map:
-        if any(keyword in lower for keyword in keywords):
-            points.append(label)
-    return points[:3]
+def clean_source(text: str) -> str:
+    text = URL_RE.sub("", text or "")
+    text = HANDLE_RE.sub("", text)
+    return " ".join(text.split()).strip()
+
+
+def payload_quality_ok(payload: dict[str, Any]) -> bool:
+    title = str(payload.get("title") or "")
+    text = " ".join(
+        [
+            title,
+            str(payload.get("notification_text") or ""),
+            " ".join(str(item) for item in payload.get("bullets") or []),
+            str(payload.get("why_it_matters") or ""),
+            " ".join(str(item) for item in payload.get("risks") or []),
+        ]
+    )
+    if not title_quality_ok(title) or not has_chinese(text) or has_mojibake(text):
+        return False
+    stripped = allowed_english_stripped(text)
+    if ENGLISH_RESIDUE_RE.search(stripped):
+        return False
+    if COMMON_ENGLISH_WORD_RE.search(stripped):
+        return False
+    return True
 
 
 def allowed_english_stripped(text: str) -> str:
@@ -159,6 +184,9 @@ def allowed_english_stripped(text: str) -> str:
         "Celestial",
         "Lightmatter",
         "Lighthorse",
+        "Poet",
+        "TFLN",
+        "Sivers",
     ]
     for word in allowed:
         stripped = re.sub(rf"\b{re.escape(word)}\b", " ", stripped, flags=re.IGNORECASE)
@@ -167,128 +195,82 @@ def allowed_english_stripped(text: str) -> str:
     return stripped
 
 
-def payload_quality_ok(payload: dict[str, Any]) -> bool:
-    if not title_quality_ok(str(payload.get("title") or "")):
-        return False
-    text = " ".join(
-        [
-            str(payload.get("notification_text") or ""),
-            " ".join(str(item) for item in payload.get("bullets") or []),
-            str(payload.get("why_it_matters") or ""),
-        ]
-    )
-    if not has_chinese(text):
-        return False
-    stripped = allowed_english_stripped(text)
-    if ENGLISH_RESIDUE_RE.search(stripped):
-        return False
-    if COMMON_ENGLISH_WORD_RE.search(stripped):
-        return False
-    latin_letters = len(re.findall(r"[A-Za-z]", stripped))
-    cjk_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
-    return cjk_chars > 0 and latin_letters / max(cjk_chars, 1) < 0.08
-
-
 def title_quality_ok(title: str) -> bool:
     title = " ".join((title or "").split())
     if not title or len(title) > 40:
         return False
     if URL_RE.search(title) or "@" in title:
         return False
-    if GENERIC_TITLE_RE.search(title):
+    if re.search(r"(serenity|alerts?|summary|new post|新帖提醒)", title, re.I):
         return False
-    if not has_chinese(title):
-        return False
-    return len(re.findall(r"[\u4e00-\u9fff]", title)) >= 4
-
-
-def clean_source_for_translation(text: str) -> str:
-    text = URL_RE.sub("", text or "")
-    text = HANDLE_RE.sub("", text)
-    return " ".join(text.split()).strip()
-
-
-def rough_translate_fallback(text: str) -> str:
-    cleaned = clean_source_for_translation(text)
-    replacements = [
-        ("For people trying to do valuation analysis on", "如果想对"),
-        ("valuation analysis", "估值分析"),
-        ("are probably valued", "大概率估值在"),
-        ("probably", "大概"),
-        ("I think I deserve my own Netflix special after", "作者开玩笑说，经历"),
-        ("Did you listen anon?", "之前提醒过了，你注意到了吗？"),
-        ("is extremely early", "还处在非常早期"),
-        ("We're about to see", "接下来可能会看到"),
-        ("a ton of institutional inflow", "大量机构资金流入"),
-        ("institutional inflow", "机构资金流入"),
-        ("is the largest beneficiary", "是最大的受益者"),
-        ("brand new events this weekend", "这个周末的新催化"),
-        ("index inclusion", "指数纳入"),
-        ("Blackrock", "贝莱德"),
-        ("Vanguard", "先锋"),
-        ("MSCI", "MSCI"),
-        ("NASDAQ", "纳斯达克"),
-        ("Nasdaq", "纳斯达克"),
-        ("beneficiary", "受益者"),
-        ("extremely early", "非常早期"),
-        ("early", "早期"),
-        ("after", "之后"),
-        ("and", "和"),
-        ("or", "或"),
-        ("as", "作为"),
-        ("on", "关于"),
-    ]
-    translated = cleaned
-    for source, target in replacements:
-        translated = translated.replace(source, target)
-    return translated
-
-
-def fallback_zh_payload(summary: AlertSummary) -> dict[str, Any]:
-    text = clean_source_for_translation(source_text(summary))
-    tickers = _tickers(text, summary.tickers)
-    ticker_text = "、".join(f"${ticker}" for ticker in tickers) if tickers else "相关标的"
-    restatement = rough_translate_fallback(text)
-    title = fallback_zh_title(text, tickers)
-    notification = f"作者这条帖子的意思是（涉及 {ticker_text}）：{restatement}"
-    bullets = [f"涉及标的：{ticker_text}", "含义：这是原帖语义的中文转述，等待模型生成更精确版本。"]
-    return {
-        "title": title,
-        "notification_text": notification[:420],
-        "bullets": bullets[:3],
-        "why_it_matters": "中文 feed 会优先使用模型翻译原帖全段意思；模型暂不可用时显示这版临时中文转述。",
-    }
+    return has_chinese(title) and not has_mojibake(title)
 
 
 def fallback_zh_title(text: str, tickers: list[str]) -> str:
-    primary = f"${tickers[0]}" if tickers else "相关标的"
+    primary = f"${tickers[0]}" if tickers else "监控源"
     lower = text.lower()
     if any(word in lower for word in ["valuation", "valued", "undervalued", "cheap"]):
         return f"{primary} 估值线索更新"
-    if any(word in lower for word in ["institutional inflow", "index inclusion", "vanguard", "blackrock", "msci", "nasdaq"]):
+    if any(word in lower for word in ["inflow", "index inclusion", "vanguard", "blackrock", "msci", "nasdaq"]):
         return f"{primary} 机构资金催化"
     if any(word in lower for word in ["beneficiary", "benefit", "winner"]):
         return f"{primary} 受益逻辑更新"
-    if any(word in lower for word in ["netflix special", "deserve my own"]):
-        return f"{primary} 成功案例调侃"
-    if any(word in lower for word in ["subscribe", "followers", "thank"]):
-        return "订阅人数进展"
+    if any(word in lower for word in ["cpo", "optical", "photonics", "800g", "1.6t"]):
+        return f"{primary} 光互连线索更新"
+    if any(word in lower for word in ["hbm", "memory", "dram"]):
+        return f"{primary} 存储链线索更新"
     if tickers:
         return f"{primary} 观点更新"
     return "市场观点更新"
+
+
+def fallback_zh_payload(summary: AlertSummary) -> dict[str, Any]:
+    text = clean_source(source_text(summary))
+    tickers = _tickers(text, summary.tickers)
+    ticker_text = "、".join(f"${ticker}" for ticker in tickers) if tickers else "相关标的"
+    compact = rough_translate_fallback(text, tickers)
+    return {
+        "title": fallback_zh_title(text, tickers),
+        "notification_text": (
+            f"监控源发布了新的原创内容，涉及 {ticker_text}。"
+            f"模型暂时不可用，以下为规则回退摘要：{compact}"
+        )[:480],
+        "bullets": [
+            f"涉及标的：{ticker_text}",
+            "这是模型不可用时的回退摘要，原文链接应作为最终复核来源。",
+        ],
+        "why_it_matters": "这条内容来自已监控来源，可能影响相关标的的产业链叙事、资金关注度或事件催化。",
+        "risks": ["模型未生成深度中文摘要。", "仅供信息参考，不构成投资建议。"],
+    }
+
+
+def rough_translate_fallback(text: str, tickers: list[str]) -> str:
+    lower = text.lower()
+    primary = f"${tickers[0]}" if tickers else "相关标的"
+    if "institutional inflow" in lower or "index inclusion" in lower:
+        return (
+            f"作者认为 {primary} 仍处在非常早期，接下来可能看到 BlackRock、"
+            "Vanguard、MSCI、Nasdaq 等机构资金流入以及指数相关资金流入。"
+        )
+    if any(word in lower for word in ["valuation", "valued", "undervalued", "cheap"]):
+        return f"作者围绕 {primary} 的估值和潜在低估逻辑展开讨论，需要结合原文和基本面复核。"
+    if any(word in lower for word in ["beneficiary", "benefit", "winner"]):
+        return f"作者强调 {primary} 可能是相关产业趋势的受益标的，需要复核事件和订单证据。"
+    compact = text[:220] + ("..." if len(text) > 220 else "")
+    return f"原文关键信息保留如下，需人工复核：{compact}"
 
 
 def _client_kwargs(settings: Settings) -> dict[str, Any]:
     kwargs: dict[str, Any] = {"api_key": settings.openai_api_key}
     if settings.openai_base_url:
         kwargs["base_url"] = settings.openai_base_url
-    default_headers = {}
+    headers = {}
     if settings.openai_http_referer:
-        default_headers["HTTP-Referer"] = settings.openai_http_referer
+        headers["HTTP-Referer"] = settings.openai_http_referer
     if settings.openai_app_title:
-        default_headers["X-OpenRouter-Title"] = settings.openai_app_title
-    if default_headers:
-        kwargs["default_headers"] = default_headers
+        headers["X-OpenRouter-Title"] = settings.openai_app_title
+    if headers:
+        kwargs["default_headers"] = headers
     return kwargs
 
 
@@ -304,6 +286,7 @@ def _validated_payloads(items: list[FeedLocalizationItem]) -> dict[str, dict[str
             "notification_text": item.notification_text,
             "bullets": item.bullets,
             "why_it_matters": item.why_it_matters,
+            "risks": item.risks,
         }
         if payload_quality_ok(payload):
             valid[item.id] = payload
@@ -320,7 +303,7 @@ def generate_zh_batch(
     items = [
         {
             "id": summary.id,
-            "author": summary.post.author_handle if summary.post else "aleabitoreddit",
+            "author": summary.post.author_handle if summary.post else "source",
             "source_url": summary.source_url,
             "tickers": summary.tickers or [],
             "text": source_text(summary),
@@ -328,39 +311,24 @@ def generate_zh_batch(
         for summary in summaries
     ]
     system_prompt = (
-        "你是 US Monitor 的中文金融情报翻译器。"
-        "任务不是抽关键词，而是把每条 X 原帖的全段意思直接翻译/转述给中文用户。"
-        "用户不懂英文，所以 notification_text 必须让用户不看原帖也能理解作者完整表达。"
-        "中文要像中国投资者日常会说的话，顺口、自然，不要翻译腔。"
-        "保留股票代码、关键公司名、语气和因果关系；链接可概括为“附了链接”。"
-        "不要写“原帖提到”、不要说“需要结合原帖”、不要让用户自己去看原帖。"
-        "title 必须是对整条帖子的短标题，8-22 个中文字符，像财经快讯标题；"
-        "可以包含核心 ticker，但禁止使用“Serenity 新帖提醒”“总结”“新帖”等泛化标题。"
-        "除了股票代码、公司名、指数名、机构名之外，禁止保留英文句子或英文短语。"
-        "如果原文有 'we are about to see'，要译成“接下来可能会看到”。"
-        "如果原文有 'This is what it is like'，要译成“这就是这种阶段通常会发生的事情”。"
-        "不要输出买卖建议、仓位建议或收益承诺。"
-        "notification_text 用自然中文，120-320 个中文字符；短帖可以更短。"
-        "bullets 最多 3 条，用中文提炼核心含义。"
+        "你是 US Monitor 的中文金融情报翻译器。任务是把每条 X 原帖的完整意思转成自然简体中文，"
+        "让中文用户不看原帖也能理解作者表达。保留股票代码、公司名、因果关系和语气；不要给买卖建议、"
+        "仓位建议或收益承诺。title 写成 8-22 个中文字符的财经快讯标题，不要使用泛化标题。"
     )
-    use_responses_api = "openrouter.ai" not in settings.openai_base_url.lower()
-    if use_responses_api:
-        try:
-            from openai import OpenAI
+    try:
+        from openai import OpenAI
 
-            client = OpenAI(**_client_kwargs(settings))
+        client = OpenAI(**_client_kwargs(settings))
+        if "openrouter.ai" not in settings.openai_base_url.lower():
             response = client.responses.parse(
                 model=_translation_model(settings),
                 input=[
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
+                    {"role": "system", "content": system_prompt},
                     {
                         "role": "user",
                         "content": (
-                            "请按原 id 返回。每条 notification_text 要直接复述作者整段话的中文意思，"
-                            "不是关键词摘要；每条 title 要概括全篇重点，不要固定模板标题。\n"
+                            "请按 id 返回。每条 notification_text 用自然中文，120-320 个中文字符；"
+                            "bullets 最多 3 条；risks 最多 3 条。\n"
                             f"{json.dumps(items, ensure_ascii=False)}"
                         ),
                     },
@@ -377,13 +345,7 @@ def generate_zh_batch(
                         parsed_items = parsed.items
                         break
             return _validated_payloads(parsed_items)
-        except Exception as exc:
-            logger.warning("Responses feed localization failed: %s", exc.__class__.__name__)
 
-    try:
-        from openai import OpenAI
-
-        client = OpenAI(**_client_kwargs(settings))
         response = client.chat.completions.create(
             model=_translation_model(settings),
             messages=[
@@ -393,21 +355,18 @@ def generate_zh_batch(
                     "content": (
                         "请返回严格 JSON，格式为 "
                         '{"items":[{"id":"...","title":"...","notification_text":"...",'
-                        '"bullets":["..."],"why_it_matters":"..."}]}。'
-                        "再次强调：notification_text 必须是中国用户能直接读懂的自然中文，"
-                        "不得残留英文句子或英文短语；title 必须是智能短标题，不得写 Serenity 新帖提醒。"
-                        f"\n需要处理的 items:\n{json.dumps(items, ensure_ascii=False)}"
+                        '"bullets":["..."],"why_it_matters":"...","risks":["..."]}]}。\n'
+                        f"{json.dumps(items, ensure_ascii=False)}"
                     ),
                 },
             ],
             response_format={"type": "json_object"},
         )
-        content = response.choices[0].message.content or "{}"
-        data = json.loads(content)
+        data = json.loads(response.choices[0].message.content or "{}")
         parsed = FeedLocalizationBatch.model_validate(data)
         return _validated_payloads(parsed.items)
     except Exception as exc:
-        logger.warning("Chat feed localization failed: %s", exc.__class__.__name__)
+        logger.warning("Feed localization failed: %s", exc.__class__.__name__)
         return {}
 
 

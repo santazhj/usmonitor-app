@@ -3,21 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f7f4ef" />
+    <meta name="theme-color" content="#09090b" />
     <link rel="icon" href="/icon.svg" />
-    <link rel="stylesheet" href="/static/styles.css" />
-    <title>Serenity Admin</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-admin-terminal" />
+    <title>US Monitor Admin</title>
   </head>
-  <body>
+  <body class="admin-page">
     <main class="shell">
       <header class="topbar">
         <a class="brand" href="/">
           <img src="/icon.svg" alt="" />
-          <span>Serenity Admin</span>
+          <span>US Monitor Admin</span>
         </a>
         <nav class="nav-actions">
           <span id="adminSession" class="admin-session hidden"></span>
-          <a class="quiet-link" href="/">App</a>
+          <a class="quiet-link" href="/">看板</a>
         </nav>
       </header>
 
@@ -27,14 +27,17 @@
           <h2>正在验证管理员权限</h2>
         </div>
         <p id="accessMessage" class="status-line">请稍候。</p>
-        <a id="accessAction" class="primary access-action hidden" href="/">回到 App 登录</a>
+        <a id="accessAction" class="primary access-action hidden" href="/">返回登录</a>
       </section>
 
       <section id="adminContent" class="admin-layout hidden">
         <section class="panel wide">
-          <div class="section-title">
-            <p class="eyebrow">Metrics</p>
-            <h2>概览</h2>
+          <div class="section-title admin-title-row">
+            <div>
+              <p class="eyebrow">Metrics</p>
+              <h2>运营概览</h2>
+            </div>
+            <button id="refreshAdminBtn" class="secondary" type="button">刷新</button>
           </div>
           <div id="countsBox" class="metrics-grid"></div>
           <p id="adminMessage" class="status-line"></p>
@@ -50,18 +53,18 @@
 
         <section class="panel wide">
           <div class="section-title">
-            <p class="eyebrow">Traffic</p>
-            <h2>页面浏览与停留</h2>
-          </div>
-          <div id="pageStatsBox" class="admin-table"></div>
-        </section>
-
-        <section class="panel wide">
-          <div class="section-title">
             <p class="eyebrow">Payments</p>
             <h2>待确认付款</h2>
           </div>
           <div id="paymentsBox" class="table-list"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="section-title">
+            <p class="eyebrow">Traffic</p>
+            <h2>页面浏览与停留</h2>
+          </div>
+          <div id="pageStatsBox" class="admin-table"></div>
         </section>
 
         <section class="panel wide">
@@ -81,6 +84,7 @@
         </section>
       </section>
     </main>
-    <script src="/static/admin.js?v=20260525-admin-bypass" type="module"></script>
+
+    <script src="/static/admin.js?v=20260612-admin-terminal" type="module"></script>
   </body>
 </html>

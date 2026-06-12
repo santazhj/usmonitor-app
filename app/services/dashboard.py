@@ -7,6 +7,7 @@ from app.models import utcnow
 from app.services.market_data import MarketDataResult
 
 MAINLAND_LISTING_SUFFIXES = (".SZ", ".SS", ".SH", ".BJ")
+MOJIBAKE_MARKERS = ("杩", "鎴", "鐪", "浠", "鈥", "檚", "锛", "銆", "€?")
 
 
 def normalize_ticker(ticker: str) -> str:
@@ -15,6 +16,15 @@ def normalize_ticker(ticker: str) -> str:
 
 def is_mainland_listing(ticker: str) -> bool:
     return normalize_ticker(ticker).endswith(MAINLAND_LISTING_SUFFIXES)
+
+
+def text_quality_ok(text: str | None) -> bool:
+    text = text or ""
+    return bool(text.strip()) and not any(marker in text for marker in MOJIBAKE_MARKERS)
+
+
+def safe_text(text: str | None, fallback: str) -> str:
+    return text if text_quality_ok(text) else fallback
 
 
 def row(
@@ -739,7 +749,10 @@ def mention_rows(mentions: list[WatchlistMention]) -> list[dict]:
                 "Global",
                 "Serenity Alert",
                 "Positive source mention",
-                mention.reason or "Added from a constructive Serenity X-source post",
+                safe_text(
+                    mention.reason,
+                    "Added from a constructive Serenity X-source post. Open the source for detail.",
+                ),
                 "Serenity positive",
                 "Source driven",
             )
@@ -772,6 +785,11 @@ def _market_payload(item: dict, market_rows: dict[str, dict[str, Any]]) -> dict:
         "change_percent": market.get("change_percent"),
         "volume": market.get("volume"),
         "dollar_volume": market.get("dollar_volume"),
+        "open": market.get("open"),
+        "high": market.get("high"),
+        "low": market.get("low"),
+        "close": market.get("close"),
+        "previous_close": market.get("previous_close"),
         "market_cap": market.get("market_cap"),
         "pe_ratio": market.get("pe_ratio"),
         "pe_note": market.get("pe_note"),
@@ -800,7 +818,7 @@ def get_dashboard_snapshot(
         if mention:
             item = {
                 **item,
-                "latest_signal": mention.reason or item["latest_signal"],
+                "latest_signal": safe_text(mention.reason, item["latest_signal"]),
                 "source_url": mention.source_url,
                 "source_added_at": mention.created_at.isoformat(),
             }

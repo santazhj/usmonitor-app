@@ -6,149 +6,141 @@
     <meta name="theme-color" content="#09090b" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260610-product3d" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-usmonitor-terminal" />
     <title>US Monitor</title>
   </head>
-  <body class="market-page">
-    <main class="shell">
-      <header class="topbar">
-        <div class="brand-cluster">
-          <a class="brand" href="/" aria-label="US Monitor">
-            <img src="/icon.svg" alt="" />
-            <span>US Monitor</span>
-          </a>
-          <span id="planBadge" class="plan-badge" data-plan-status="loading" data-i18n="plan.loading">
-            检查权限
+  <body class="market-page terminal-page">
+    <main class="shell terminal-shell">
+      <header class="terminal-topbar">
+        <a class="terminal-brand" href="/" aria-label="US Monitor">
+          <img src="/icon.svg" alt="" />
+          <span>
+            <strong>US Monitor</strong>
+            <small data-i18n="brand.subtitle">AI 产业链情报终端</small>
           </span>
-        </div>
-        <nav class="nav-actions" aria-label="Primary">
-          <a class="quiet-link" href="#dashboard" data-i18n="nav.dashboard">看板</a>
-          <a class="quiet-link" href="/options">Options</a>
+        </a>
+        <nav class="terminal-nav" aria-label="Primary">
+          <a class="quiet-link active" href="#dashboard" data-i18n="nav.dashboard">看板</a>
           <a class="quiet-link" href="#alerts" data-i18n="nav.alerts">情报</a>
           <a class="quiet-link" href="/login" data-i18n="nav.account">账户</a>
           <a id="adminLink" class="quiet-link hidden" href="/admin">Admin</a>
-          <button id="languageToggle" class="text-button lang-toggle" type="button">
-            EN
-          </button>
-          <button id="logoutBtn" class="text-button hidden" type="button" data-i18n="nav.logout">
+          <button id="languageToggle" class="terminal-button ghost" type="button">EN</button>
+          <button id="logoutBtn" class="terminal-button ghost hidden" type="button" data-i18n="nav.logout">
             退出
           </button>
         </nav>
       </header>
 
-      <section id="dashboard" class="dashboard-shell">
-        <section class="dashboard-main">
-          <div class="dashboard-heading market-hero">
-            <div class="hero-copy">
-              <p class="eyebrow" data-i18n="hero.eyebrow">AI 基础设施</p>
-              <h1 data-i18n="hero.title">美股 AI 产业链终端</h1>
-              <p class="lede" data-i18n="hero.lede">
-                按算力、半导体、光互连、电力和软件分层跟踪核心标的，聚焦价格、流动性和产业链瓶颈。
-              </p>
-              <div class="hero-pills" aria-label="Dashboard coverage">
-                <span data-i18n="hero.pill.watchlist">Watchlist matrix</span>
-                <span data-i18n="hero.pill.sources">Live source checks</span>
-                <span data-i18n="hero.pill.alerts">Curated alert feed</span>
-              </div>
-            </div>
-            <div class="refresh-card market-status-card">
-              <span id="refreshLabel">15s refresh target</span>
-              <strong id="dataStatus">Loading</strong>
-              <div class="status-meter" aria-hidden="true"><i></i></div>
-              <small id="lastUpdated">--</small>
-            </div>
-          </div>
+      <section id="dashboard" class="terminal-hero">
+        <div>
+          <p class="eyebrow" data-i18n="hero.eyebrow">AI Infrastructure</p>
+          <h1 data-i18n="hero.title">美股 AI 产业链监控</h1>
+          <p data-i18n="hero.lede">
+            按云资本开支、算力网络、晶圆制造、存储、封装、光互连、电力冷却和软件数据分层跟踪核心标的。
+          </p>
+        </div>
+        <div class="terminal-status-card">
+          <span data-i18n="status.label">数据状态</span>
+          <strong id="dataStatus">Loading</strong>
+          <small id="lastUpdated">--</small>
+        </div>
+      </section>
 
-          <div class="metric-strip" id="dashboardMetrics"></div>
+      <section id="dashboardMetrics" class="terminal-kpis" aria-label="Dashboard metrics"></section>
 
-          <div class="dashboard-command">
-            <label class="search-box" for="dashboardSearch">
-              <span data-i18n="search.label">搜索</span>
+      <section class="terminal-layout">
+        <aside class="terminal-sidebar" aria-label="Filters">
+          <section class="terminal-card">
+            <div class="terminal-card-head">
+              <span data-i18n="filters.title">产业链分组</span>
+              <button id="clearFiltersBtn" class="icon-text-button" type="button" data-i18n="filters.clear">
+                清空
+              </button>
+            </div>
+            <div id="categoryTabs" class="terminal-category-list"></div>
+          </section>
+
+          <section class="terminal-card">
+            <div class="terminal-card-head">
+              <span data-i18n="sources.title">数据源</span>
+              <span id="refreshLabel" class="muted">--</span>
+            </div>
+            <div id="sourceStatus" class="terminal-source-list"></div>
+          </section>
+        </aside>
+
+        <section class="terminal-main">
+          <div class="terminal-toolbar">
+            <label class="terminal-search" for="dashboardSearch">
+              <span aria-hidden="true">⌕</span>
               <input
                 id="dashboardSearch"
                 type="search"
                 autocomplete="off"
                 data-i18n-placeholder="search.placeholder"
-                placeholder="Ticker, company, AI role"
+                placeholder="搜索 ticker、公司、AI 角色"
               />
             </label>
-            <p id="tableStatus" class="table-status">--</p>
+            <select id="rowQualityFilter" class="terminal-select" aria-label="Data quality">
+              <option value="all" data-i18n="quality.all">全部</option>
+              <option value="live" data-i18n="quality.live">有行情</option>
+              <option value="missing" data-i18n="quality.missing">缺行情</option>
+            </select>
           </div>
 
-          <div class="category-tabs" id="categoryTabs"></div>
-
-          <section class="market-table-wrap" aria-label="AI stock watchlist">
-            <div class="market-table-title">
+          <section class="terminal-table-card" aria-label="AI stock watchlist">
+            <div class="terminal-table-title">
               <div>
-                <p class="eyebrow" data-i18n="table.sectionEyebrow">Watchlist matrix</p>
-                <h2 data-i18n="table.sectionTitle">产业链标的矩阵</h2>
+                <span class="eyebrow">Watchlist Matrix</span>
+                <h2 data-i18n="table.title">产业链标的矩阵</h2>
               </div>
-              <span data-i18n="table.sectionMeta">点击行查看产业链定位</span>
+              <p id="tableStatus">--</p>
             </div>
-            <div class="market-table-header">
-              <button class="table-sort" data-sort="ticker" type="button" data-i18n="table.ticker">
-                代码
-              </button>
-              <button class="table-sort" data-sort="price" type="button" data-i18n="table.price">
-                价格
-              </button>
-              <button class="table-sort" data-sort="change_percent" type="button" data-i18n="table.change">
-                % 涨跌
-              </button>
-              <button class="table-sort" data-sort="market_cap" type="button" data-i18n="table.marketCap">
-                市值
-              </button>
-              <button class="table-sort" data-sort="dollar_volume" type="button" data-i18n="table.dollarVolume">
-                交易额
-              </button>
-              <button class="table-sort" data-sort="pe_ratio" type="button" data-i18n="table.pe">
-                PE
-              </button>
-              <span data-i18n="table.aiRole">AI 角色</span>
+            <div class="terminal-table-scroll">
+              <div class="terminal-table" role="table">
+                <div class="terminal-table-row terminal-table-head" role="row">
+                  <button class="table-sort sticky-col" data-sort="ticker" type="button" data-i18n="table.ticker">标的</button>
+                  <button class="table-sort" data-sort="price" type="button" data-i18n="table.price">最新价</button>
+                  <button class="table-sort" data-sort="change_percent" type="button" data-i18n="table.change">% 涨跌</button>
+                  <button class="table-sort" data-sort="dollar_volume" type="button" data-i18n="table.dollarVolume">成交额</button>
+                  <button class="table-sort" data-sort="market_cap" type="button" data-i18n="table.marketCap">市值</button>
+                  <button class="table-sort" data-sort="pe_ratio" type="button" data-i18n="table.pe">PE</button>
+                  <button class="table-sort" data-sort="category_label" type="button" data-i18n="table.layer">分层</button>
+                  <span data-i18n="table.role">AI 角色</span>
+                  <span data-i18n="table.source">数据</span>
+                </div>
+                <div id="dashboardRows" class="terminal-table-body"></div>
+              </div>
             </div>
-            <div id="dashboardRows" class="market-table-body"></div>
           </section>
         </section>
 
-        <aside class="dashboard-rail">
-          <section id="alerts" class="rail-panel">
-            <div class="section-title">
-              <p class="eyebrow" data-i18n="rail.alertsEyebrow">提醒</p>
-              <h2 data-i18n="rail.alertsTitle">最新情报</h2>
+        <aside id="alerts" class="terminal-alerts">
+          <section class="terminal-card">
+            <div class="terminal-card-head">
+              <span data-i18n="alerts.title">最新情报</span>
+              <div class="feed-filter" role="group" aria-label="Alert filter">
+                <button class="feed-filter-btn active" data-feed-filter="all" type="button" data-i18n="alerts.all">全部</button>
+                <button class="feed-filter-btn" data-feed-filter="unread" type="button" data-i18n="alerts.unread">未读</button>
+                <button class="feed-filter-btn" data-feed-filter="saved" type="button" data-i18n="alerts.saved">收藏</button>
+              </div>
             </div>
-            <div id="feedBox" class="feed-list compact-feed">
-              <p class="empty" data-i18n="alerts.signedOut">正在加载公开情报 feed。</p>
+            <div id="feedBox" class="terminal-feed-list">
+              <p class="empty" data-i18n="alerts.loading">正在加载情报...</p>
             </div>
-          </section>
-
-          <section class="rail-panel">
-            <div class="section-title">
-              <p class="eyebrow" data-i18n="rail.sourceEyebrow">数据源状态</p>
-              <h2 data-i18n="rail.sourceTitle">数据状态</h2>
-            </div>
-            <div id="sourceStatus" class="source-list"></div>
-          </section>
-
-          <section class="rail-panel disclaimer-panel">
-            <p class="eyebrow" data-i18n="terms.eyebrow">定位</p>
-            <h2 data-i18n="terms.title">情报摘要，不是交易建议</h2>
-            <p data-i18n="terms.body">
-              当前市场数据和情报先公开展示；邮箱注册用于账户、推送、付款和后续 VIP 权限。
-            </p>
           </section>
         </aside>
       </section>
-
     </main>
 
     <aside id="tickerDrawer" class="ticker-drawer hidden" aria-hidden="true">
       <div class="drawer-backdrop" data-drawer-close></div>
-      <section class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <section class="drawer-panel terminal-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
         <button id="drawerClose" class="icon-button" type="button" aria-label="Close">×</button>
         <div id="drawerBody"></div>
       </section>
     </aside>
 
-    <script src="/static/app.js?v=20260610-product3d" type="module"></script>
+    <script src="/static/app.js?v=20260612-usmonitor-terminal" type="module"></script>
   </body>
 </html>

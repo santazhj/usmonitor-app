@@ -6,6 +6,9 @@ const registerEmail = document.querySelector("#registerEmail");
 const resetEmail = document.querySelector("#resetEmail");
 const registerCode = document.querySelector("#registerCode");
 const resetCode = document.querySelector("#resetCode");
+const registerPassword = document.querySelector("#registerPassword");
+const resetPassword = document.querySelector("#resetPassword");
+const registerStrength = document.querySelector("#registerStrength");
 const loginButton = document.querySelector("#passwordLoginBtn");
 const registerButton = document.querySelector("#registerBtn");
 const resetButton = document.querySelector("#resetBtn");
@@ -26,6 +29,7 @@ let currentMode = "login";
 let currentUser = null;
 let registerChallengeToken = "";
 let resetChallengeToken = "";
+let countdownTimer = null;
 
 const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next"));
 
@@ -33,8 +37,8 @@ const COPY = {
   zh: {
     pageTitle: "账户登录 - US Monitor",
     badgeSignedOut: "账户",
-    badgeFree: "普通版本",
-    badgeVip: "VIP 版本",
+    badgeFree: "普通版",
+    badgeVip: "VIP",
     eyebrow: "账户访问",
     title: "账号密码登录",
     lede: "注册时用邮箱验证码确认身份并设置密码。之后登录只需要邮箱和密码。",
@@ -59,23 +63,25 @@ const COPY = {
     failedRegister: "注册失败。请确认验证码、邮箱和密码。",
     failedReset: "重设失败。请确认验证码、邮箱和新密码。",
     signedIn: "已登录",
-    signedInDetail: "{email} 当前为{plan}。",
+    signedInDetail: "{email} 当前为 {plan}。",
     continueTo: "继续",
     backDashboard: "返回看板",
     logout: "退出登录",
     signedOut: "已退出登录。",
-    sideEyebrow: "One account",
-    sideTitle: "US Monitor 与 Options 共用同一个登录态",
-    sideBody: "在主站登录后，Options 页面会自动识别同一个账户；反过来也一样。",
-    pointOne: "注册验证码 15 分钟有效",
+    sideEyebrow: "Private Access",
+    sideTitle: "US Monitor 独立账户",
+    sideBody: "这个账户只用于 US Monitor 的情报看板、推送和后台权限。Options 工具已保持本地独立，不在本站开放。",
+    pointOne: "验证码 15 分钟有效",
     pointTwo: "密码只保存安全哈希",
-    pointThree: "找回密码也用邮箱验证码"
+    pointThree: "找回密码同样使用邮箱验证码",
+    weakPassword: "密码至少 8 位，建议包含字母和数字。",
+    goodPassword: "密码强度可用。"
   },
   en: {
     pageTitle: "Account Login - US Monitor",
     badgeSignedOut: "Account",
-    badgeFree: "Free version",
-    badgeVip: "VIP version",
+    badgeFree: "Free",
+    badgeVip: "VIP",
     eyebrow: "Account Access",
     title: "Password Sign In",
     lede: "Register with an email code and set a password. After that, sign in with email and password.",
@@ -105,18 +111,21 @@ const COPY = {
     backDashboard: "Back to dashboard",
     logout: "Sign out",
     signedOut: "Signed out.",
-    sideEyebrow: "One account",
-    sideTitle: "US Monitor and Options share one session",
-    sideBody: "If you sign in on the main site, the Options page will recognize the same account, and vice versa.",
-    pointOne: "Registration codes expire in 15 minutes",
+    sideEyebrow: "Private Access",
+    sideTitle: "US Monitor standalone account",
+    sideBody: "This account is only for US Monitor intelligence, push notifications, and admin access. The Options tool stays local and private.",
+    pointOne: "Codes expire in 15 minutes",
     pointTwo: "Passwords are stored as secure hashes",
-    pointThree: "Password recovery uses an email code"
+    pointThree: "Password recovery uses an email code",
+    weakPassword: "Use at least 8 characters; letters and numbers are recommended.",
+    goodPassword: "Password strength is usable."
   }
 };
 
 function safeNextPath(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
-  return value === "/login" ? "/" : value;
+  if (value === "/login" || value.startsWith("/options")) return "/";
+  return value;
 }
 
 function t(key, params = {}) {
@@ -203,9 +212,7 @@ function renderAccount(user, shouldRedirect = false) {
     setMessage(t("signedOut"), "success");
   });
   if (shouldRedirect && nextPath !== "/") {
-    window.setTimeout(() => {
-      window.location.assign(nextPath);
-    }, 450);
+    window.setTimeout(() => window.location.assign(nextPath), 450);
   }
 }
 
@@ -219,6 +226,22 @@ function applyCopy() {
   updateBadge(currentUser);
 }
 
+function startCountdown(button) {
+  let seconds = 45;
+  clearInterval(countdownTimer);
+  button.disabled = true;
+  const original = t("sendCode");
+  button.textContent = `${seconds}s`;
+  countdownTimer = setInterval(() => {
+    seconds -= 1;
+    button.textContent = seconds > 0 ? `${seconds}s` : original;
+    if (seconds <= 0) {
+      clearInterval(countdownTimer);
+      button.disabled = false;
+    }
+  }, 1000);
+}
+
 async function sendCode(mode) {
   const emailInput = mode === "register" ? registerEmail : resetEmail;
   const codeInput = mode === "register" ? registerCode : resetCode;
@@ -229,7 +252,6 @@ async function sendCode(mode) {
     return;
   }
   localStorage.setItem(LAST_EMAIL_KEY, email);
-  button.disabled = true;
   setMessage(t("sending"));
   try {
     const result = await api("/api/auth/code/request", {
@@ -240,15 +262,22 @@ async function sendCode(mode) {
     if (mode === "reset") resetChallengeToken = result.challenge_token;
     codeInput.value = result.dev_code || "";
     codeInput.focus();
+    startCountdown(button);
     setMessage(
       result.dev_code ? `${t("sent")} ${t("devCode", { code: result.dev_code })}` : t("sent"),
       "success"
     );
   } catch {
-    setMessage(t("failedSend"), "error");
-  } finally {
     button.disabled = false;
+    setMessage(t("failedSend"), "error");
   }
+}
+
+function updateStrength(input) {
+  const value = input.value || "";
+  const good = value.length >= 8 && /[A-Za-z]/.test(value) && /\d/.test(value);
+  registerStrength.textContent = value ? (good ? t("goodPassword") : t("weakPassword")) : "";
+  registerStrength.dataset.tone = good ? "success" : "warn";
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -261,12 +290,8 @@ loginForm.addEventListener("submit", async (event) => {
   try {
     const result = await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({
-        email,
-        password: String(form.get("password") || "")
-      })
+      body: JSON.stringify({ email, password: String(form.get("password") || "") })
     });
-    setMessage(t("signedIn"), "success");
     renderAccount(result.user, true);
   } catch {
     setMessage(t("failedLogin"), "error");
@@ -274,9 +299,6 @@ loginForm.addEventListener("submit", async (event) => {
     loginButton.disabled = false;
   }
 });
-
-registerCodeBtn.addEventListener("click", () => sendCode("register"));
-resetCodeBtn.addEventListener("click", () => sendCode("reset"));
 
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -291,11 +313,10 @@ registerForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         email,
         password: String(form.get("password") || ""),
-        code: String(form.get("code") || "").trim(),
+        code: String(form.get("code") || ""),
         challenge_token: registerChallengeToken
       })
     });
-    setMessage(t("signedIn"), "success");
     renderAccount(result.user, true);
   } catch {
     setMessage(t("failedRegister"), "error");
@@ -317,11 +338,10 @@ resetForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         email,
         password: String(form.get("password") || ""),
-        code: String(form.get("code") || "").trim(),
+        code: String(form.get("code") || ""),
         challenge_token: resetChallengeToken
       })
     });
-    setMessage(t("signedIn"), "success");
     renderAccount(result.user, true);
   } catch {
     setMessage(t("failedReset"), "error");
@@ -334,24 +354,32 @@ authTabs.forEach((button) => {
   button.addEventListener("click", () => setMode(button.dataset.authMode));
 });
 
+registerCodeBtn.addEventListener("click", () => sendCode("register"));
+resetCodeBtn.addEventListener("click", () => sendCode("reset"));
+registerPassword.addEventListener("input", () => updateStrength(registerPassword));
+resetPassword.addEventListener("input", () => {});
+
 languageToggle.addEventListener("click", () => {
   currentLanguage = currentLanguage === "zh" ? "en" : "zh";
   localStorage.setItem(LANGUAGE_KEY, currentLanguage);
   applyCopy();
-  if (currentUser) {
-    renderAccount(currentUser);
-  }
+  updateStrength(registerPassword);
 });
 
-const rememberedEmail = localStorage.getItem(LAST_EMAIL_KEY);
-if (rememberedEmail) {
-  loginEmail.value = rememberedEmail;
-  registerEmail.value = rememberedEmail;
-  resetEmail.value = rememberedEmail;
+async function init() {
+  const rememberedEmail = localStorage.getItem(LAST_EMAIL_KEY) || "";
+  if (rememberedEmail) {
+    loginEmail.value = rememberedEmail;
+    registerEmail.value = rememberedEmail;
+    resetEmail.value = rememberedEmail;
+  }
+  applyCopy();
+  try {
+    const me = await api("/api/me");
+    renderAccount(me, false);
+  } catch {
+    setMode(currentMode);
+  }
 }
 
-applyCopy();
-setMode("login");
-api("/api/me")
-  .then((user) => renderAccount(user))
-  .catch(() => updateBadge(null));
+init();

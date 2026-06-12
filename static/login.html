@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#09090b" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260610-product3d" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-usmonitor-login" />
     <title>账户登录 - US Monitor</title>
   </head>
-  <body class="market-page login-page">
+  <body class="login-page">
     <main class="shell login-shell">
       <header class="topbar">
         <div class="brand-cluster">
@@ -23,7 +23,6 @@
         </div>
         <nav class="nav-actions" aria-label="Primary">
           <a class="quiet-link" href="/">看板</a>
-          <a class="quiet-link" href="/options">Options</a>
           <button id="languageToggle" class="text-button lang-toggle" type="button">
             EN
           </button>
@@ -55,119 +54,52 @@
           <form id="passwordLoginForm" class="login-form" data-auth-panel="login">
             <label>
               <span data-copy="emailLabel">邮箱</span>
-              <input
-                id="loginEmail"
-                name="email"
-                type="email"
-                autocomplete="email"
-                placeholder="you@example.com"
-                required
-              />
+              <input id="loginEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
             </label>
             <label>
               <span data-copy="passwordLabel">密码</span>
-              <input
-                id="loginPassword"
-                name="password"
-                type="password"
-                autocomplete="current-password"
-                minlength="8"
-                required
-              />
+              <input id="loginPassword" name="password" type="password" autocomplete="current-password" minlength="8" required />
             </label>
-            <button id="passwordLoginBtn" class="primary" type="submit" data-copy="loginSubmit">
-              登录
-            </button>
+            <button id="passwordLoginBtn" class="primary" type="submit" data-copy="loginSubmit">登录</button>
           </form>
 
           <form id="registerForm" class="login-form hidden" data-auth-panel="register">
             <label>
               <span data-copy="emailLabel">邮箱</span>
-              <input
-                id="registerEmail"
-                name="email"
-                type="email"
-                autocomplete="email"
-                placeholder="you@example.com"
-                required
-              />
+              <input id="registerEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
             </label>
             <div class="code-row">
               <label>
                 <span data-copy="codeLabel">验证码</span>
-                <input
-                  id="registerCode"
-                  name="code"
-                  inputmode="numeric"
-                  autocomplete="one-time-code"
-                  maxlength="6"
-                  placeholder="000000"
-                  required
-                />
+                <input id="registerCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
               </label>
-              <button id="registerCodeBtn" class="secondary" type="button" data-copy="sendCode">
-                发送验证码
-              </button>
+              <button id="registerCodeBtn" class="secondary" type="button" data-copy="sendCode">发送验证码</button>
             </div>
             <label>
               <span data-copy="setPasswordLabel">设置密码</span>
-              <input
-                id="registerPassword"
-                name="password"
-                type="password"
-                autocomplete="new-password"
-                minlength="8"
-                required
-              />
+              <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="8" required />
             </label>
-            <button id="registerBtn" class="primary" type="submit" data-copy="registerSubmit">
-              注册并登录
-            </button>
+            <p id="registerStrength" class="password-hint"></p>
+            <button id="registerBtn" class="primary" type="submit" data-copy="registerSubmit">注册并登录</button>
           </form>
 
           <form id="resetForm" class="login-form hidden" data-auth-panel="reset">
             <label>
               <span data-copy="emailLabel">邮箱</span>
-              <input
-                id="resetEmail"
-                name="email"
-                type="email"
-                autocomplete="email"
-                placeholder="you@example.com"
-                required
-              />
+              <input id="resetEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
             </label>
             <div class="code-row">
               <label>
                 <span data-copy="codeLabel">验证码</span>
-                <input
-                  id="resetCode"
-                  name="code"
-                  inputmode="numeric"
-                  autocomplete="one-time-code"
-                  maxlength="6"
-                  placeholder="000000"
-                  required
-                />
+                <input id="resetCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
               </label>
-              <button id="resetCodeBtn" class="secondary" type="button" data-copy="sendCode">
-                发送验证码
-              </button>
+              <button id="resetCodeBtn" class="secondary" type="button" data-copy="sendCode">发送验证码</button>
             </div>
             <label>
               <span data-copy="newPasswordLabel">新密码</span>
-              <input
-                id="resetPassword"
-                name="password"
-                type="password"
-                autocomplete="new-password"
-                minlength="8"
-                required
-              />
+              <input id="resetPassword" name="password" type="password" autocomplete="new-password" minlength="8" required />
             </label>
-            <button id="resetBtn" class="primary" type="submit" data-copy="resetSubmit">
-              重设并登录
-            </button>
+            <button id="resetBtn" class="primary" type="submit" data-copy="resetSubmit">重设并登录</button>
           </form>
 
           <p id="loginMessage" class="login-message status-line"></p>
@@ -175,20 +107,20 @@
         </section>
 
         <aside class="login-side">
-          <p class="eyebrow" data-copy="sideEyebrow">One account</p>
-          <h2 data-copy="sideTitle">US Monitor 与 Options 共用同一个登录态</h2>
+          <p class="eyebrow" data-copy="sideEyebrow">Private Access</p>
+          <h2 data-copy="sideTitle">US Monitor 独立账户</h2>
           <p data-copy="sideBody">
-            在主站登录后，Options 页面会自动识别同一个账户；反过来也一样。
+            这个账户只用于 US Monitor 的情报看板、推送和后台权限。Options 工具已保持本地独立，不在本站开放。
           </p>
           <div class="login-points">
-            <span data-copy="pointOne">注册验证码 15 分钟有效</span>
+            <span data-copy="pointOne">验证码 15 分钟有效</span>
             <span data-copy="pointTwo">密码只保存安全哈希</span>
-            <span data-copy="pointThree">找回密码也用邮箱验证码</span>
+            <span data-copy="pointThree">找回密码同样使用邮箱验证码</span>
           </div>
         </aside>
       </section>
     </main>
 
-    <script src="/static/login.js?v=20260611-password-auth" type="module"></script>
+    <script src="/static/login.js?v=20260612-usmonitor-login" type="module"></script>
   </body>
 </html>
