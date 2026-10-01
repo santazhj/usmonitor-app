@@ -15,6 +15,7 @@
 ```
 papers/         P1-Practice-Paper-01.pdf … 10.pdf   给学生的试卷
 mark-schemes/   P1-Mark-Scheme-01.pdf … 10.pdf      评分标准（含 M/A/B 分点，勿在考前给学生）
+feedback/       每套卷的批改反馈，PDF 为交付稿（用户要求：反馈一律以 PDF 交付）
 progress-tracker.md                                  十套卷的知识点掌握追踪表（批改后填写）
 src/            试卷与评分标准的 Markdown 源文件 + 生成 PDF 的脚本
 ```
