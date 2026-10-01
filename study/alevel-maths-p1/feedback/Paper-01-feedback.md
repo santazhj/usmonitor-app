@@ -2,6 +2,8 @@
 
 **总分：47 / 75（约 63%，相当于 C 档上沿，距 B 档 52 分差 5 分）**
 
+> 2026-10-01 更新：学生补交了 Q12(b) 的英文描述（水平压缩为 0.5 倍、竖直拉伸为 3 倍），补得 1 分，修正后 **48 / 75**。考试用语建议写成 stretch parallel to the x-axis, scale factor ½ / stretch parallel to the y-axis, scale factor 3。
+
 ## 逐题得分
 
 | 题 | 得分 | 说明 |
